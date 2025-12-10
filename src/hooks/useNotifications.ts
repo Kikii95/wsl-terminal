@@ -9,7 +9,9 @@ interface CommandTracker {
 }
 
 export function useCommandNotification(tabTitle: string) {
-  const { notifications } = useConfigStore();
+  const configStore = useConfigStore();
+  // Handle case where notifications config doesn't exist yet (first load with old persisted data)
+  const notifications = configStore.notifications || { enabled: true, minDuration: 5, onlyWhenUnfocused: true };
   const trackerRef = useRef<CommandTracker>({
     startTime: null,
     lastOutputTime: null,

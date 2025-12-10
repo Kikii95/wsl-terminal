@@ -17,7 +17,10 @@ import { getTheme, AppTheme } from "@/config/themes";
 export const ThemeContext = createContext<AppTheme | null>(null);
 export const useTheme = () => {
   const theme = useContext(ThemeContext);
-  if (!theme) throw new Error("useTheme must be used within ThemeContext");
+  // Return default theme if context not available yet
+  if (!theme) {
+    return getTheme("catppuccin-mocha");
+  }
   return theme;
 };
 
