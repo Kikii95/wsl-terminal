@@ -7,12 +7,13 @@ interface TerminalState {
   wslDistros: string[];
 
   // Actions
-  addTab: (shell?: string, distro?: string) => void;
+  addTab: (shell?: string, distro?: string) => string;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTabTitle: (id: string, title: string) => void;
   updateTabColor: (id: string, color: string) => void;
   setWslDistros: (distros: string[]) => void;
+  reorderTabs: (fromIndex: number, toIndex: number) => void;
 }
 
 const generateId = () => crypto.randomUUID();
@@ -57,6 +58,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       tabs: [...state.tabs, newTab],
       activeTabId: newTab.id,
     }));
+
+    return newTab.id;
   },
 
   removeTab: (id: string) => {
@@ -101,5 +104,25 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setWslDistros: (distros: string[]) => {
     set({ wslDistros: distros });
+  },
+
+  reorderTabs: (fromIndex: number, toIndex: number) => {
+    set((state) => {
+      if (
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= state.tabs.length ||
+        toIndex >= state.tabs.length ||
+        fromIndex === toIndex
+      ) {
+        return state;
+      }
+
+      const newTabs = [...state.tabs];
+      const [movedTab] = newTabs.splice(fromIndex, 1);
+      newTabs.splice(toIndex, 0, movedTab);
+
+      return { tabs: newTabs };
+    });
   },
 }));

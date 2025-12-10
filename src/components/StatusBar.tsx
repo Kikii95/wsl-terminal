@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Circle, Palette, Check, Clock, Zap, Bell, BellOff, GitBranch, ArrowUp, ArrowDown } from "lucide-react";
+import { Circle, Palette, Check, Clock, Zap, Bell, BellOff, GitBranch, ArrowUp, ArrowDown, Container } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useConfigStore } from "@/stores/configStore";
 import { useTerminalStore } from "@/stores/terminalStore";
@@ -15,12 +15,22 @@ interface GitInfo {
   behind: number;
 }
 
+interface DockerStatus {
+  running: boolean;
+  containers: Array<{
+    name: string;
+    status: string;
+    running: boolean;
+  }>;
+}
+
 export function StatusBar() {
   const { appearance, setTheme, notifications, setNotificationsEnabled } = useConfigStore();
   const { tabs, activeTabId } = useTerminalStore();
   const [time, setTime] = useState(new Date());
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
+  const [dockerStatus, setDockerStatus] = useState<DockerStatus | null>(null);
   const theme = useTheme();
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -43,6 +53,22 @@ export function StatusBar() {
 
     fetchGitInfo();
     const interval = setInterval(fetchGitInfo, 5000); // Refresh every 5s
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch docker status periodically
+  useEffect(() => {
+    const fetchDockerStatus = async () => {
+      try {
+        const status = await invoke<DockerStatus>("get_docker_status");
+        setDockerStatus(status);
+      } catch (e) {
+        setDockerStatus(null);
+      }
+    };
+
+    fetchDockerStatus();
+    const interval = setInterval(fetchDockerStatus, 10000); // Refresh every 10s
     return () => clearInterval(interval);
   }, []);
 
@@ -113,6 +139,36 @@ export function StatusBar() {
           <div className="flex items-center gap-1.5 text-muted-foreground/30" title="Not a git repository">
             <GitBranch className="w-3 h-3" />
             <span className="italic">--</span>
+          </div>
+        )}
+
+        <span className="text-border">•</span>
+
+        {/* Docker status */}
+        {dockerStatus && (
+          <div
+            className="flex items-center gap-1.5"
+            title={dockerStatus.containers.length > 0
+              ? `Docker: ${dockerStatus.containers.filter(c => c.running).length}/${dockerStatus.containers.length} running\n${dockerStatus.containers.map(c => `${c.name}: ${c.running ? '●' : '○'}`).join('\n')}`
+              : "Docker: No containers"
+            }
+          >
+            <Container
+              className={cn(
+                "w-3 h-3",
+                dockerStatus.running ? "text-cyan-500" : "text-muted-foreground/40"
+              )}
+            />
+            {dockerStatus.containers.length > 0 ? (
+              <span className={cn(
+                "font-medium",
+                dockerStatus.running ? "text-cyan-500/80" : "text-muted-foreground/40"
+              )}>
+                {dockerStatus.containers.filter(c => c.running).length}/{dockerStatus.containers.length}
+              </span>
+            ) : (
+              <span className="text-muted-foreground/30 italic">--</span>
+            )}
           </div>
         )}
       </div>

@@ -6,11 +6,15 @@ import { TabBar } from "@/components/TabBar";
 import { PaneContainer } from "@/components/PaneContainer";
 import { StatusBar } from "@/components/StatusBar";
 import { CommandPalette } from "@/components/CommandPalette";
+import { QuickCommands } from "@/components/QuickCommands";
+import { ProjectSwitcher } from "@/components/ProjectSwitcher";
 import { SSHSidebar } from "@/components/SSHSidebar";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useConfigStore } from "@/stores/configStore";
 import { usePaneStore } from "@/stores/paneStore";
 import { useQuakeMode } from "@/hooks/useQuakeMode";
+import { useMcpHandler } from "@/hooks/useMcpHandler";
+import { useSessionRestore } from "@/hooks/useSessionRestore";
 import { getTheme, AppTheme } from "@/config/themes";
 
 // Theme context for global access
@@ -30,10 +34,18 @@ function App() {
   const { panes, initTabPane, splitPane, closePane, removeTabPanes } = usePaneStore();
   const theme = getTheme(appearance.theme);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showQuickCommands, setShowQuickCommands] = useState(false);
+  const [showProjectSwitcher, setShowProjectSwitcher] = useState(false);
   const [showSSHSidebar, setShowSSHSidebar] = useState(false);
 
   // Initialize quake mode
   useQuakeMode();
+
+  // Initialize MCP handler for Claude integration
+  useMcpHandler();
+
+  // Initialize session restore
+  useSessionRestore();
 
   // Sync CSS variables with current theme for shadcn/ui compatibility
   useEffect(() => {
@@ -161,6 +173,18 @@ function App() {
       if (e.ctrlKey && e.shiftKey && e.key === "P") {
         e.preventDefault();
         setShowCommandPalette(true);
+      }
+
+      // Ctrl+Shift+K: Quick Commands
+      if (e.ctrlKey && e.shiftKey && e.key === "K") {
+        e.preventDefault();
+        setShowQuickCommands(true);
+      }
+
+      // Ctrl+Shift+O: Project Switcher
+      if (e.ctrlKey && e.shiftKey && e.key === "O") {
+        e.preventDefault();
+        setShowProjectSwitcher(true);
       }
     };
 
@@ -306,6 +330,18 @@ function App() {
         <CommandPalette
           isOpen={showCommandPalette}
           onClose={() => setShowCommandPalette(false)}
+        />
+
+        {/* Quick Commands */}
+        <QuickCommands
+          isOpen={showQuickCommands}
+          onClose={() => setShowQuickCommands(false)}
+        />
+
+        {/* Project Switcher */}
+        <ProjectSwitcher
+          isOpen={showProjectSwitcher}
+          onClose={() => setShowProjectSwitcher(false)}
         />
 
         {/* SSH Sidebar */}

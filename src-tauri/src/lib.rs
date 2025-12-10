@@ -1,9 +1,12 @@
+pub mod mcp;
+
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::Mutex;
+use serde_json::json;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -236,6 +239,14 @@ struct GitInfo {
     behind: u32,
 }
 
+#[derive(serde::Serialize)]
+struct ProjectInfo {
+    name: String,
+    path: String,
+    category: String,
+    has_git: bool,
+}
+
 #[tauri::command]
 async fn get_git_info(path: Option<String>) -> Result<GitInfo, String> {
     let cwd = path.unwrap_or_else(|| {
@@ -305,6 +316,135 @@ async fn get_git_info(path: Option<String>) -> Result<GitInfo, String> {
     })
 }
 
+#[derive(serde::Serialize)]
+struct DockerStatus {
+    running: bool,
+    containers: Vec<DockerContainer>,
+}
+
+#[derive(serde::Serialize)]
+struct DockerContainer {
+    name: String,
+    status: String,
+    running: bool,
+}
+
+#[tauri::command]
+async fn get_docker_status() -> Result<DockerStatus, String> {
+    let output = silent_command("docker")
+        .args(["ps", "-a", "--format", "{{.Names}}|{{.Status}}|{{.State}}"])
+        .output();
+
+    match output {
+        Ok(out) if out.status.success() => {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let containers: Vec<DockerContainer> = stdout
+                .lines()
+                .filter(|l| !l.is_empty())
+                .map(|line| {
+                    let parts: Vec<&str> = line.split('|').collect();
+                    DockerContainer {
+                        name: parts.get(0).unwrap_or(&"").to_string(),
+                        status: parts.get(1).unwrap_or(&"").to_string(),
+                        running: parts.get(2).map(|s| *s == "running").unwrap_or(false),
+                    }
+                })
+                .collect();
+
+            let running = containers.iter().any(|c| c.running);
+
+            Ok(DockerStatus { running, containers })
+        }
+        _ => Ok(DockerStatus {
+            running: false,
+            containers: Vec::new(),
+        }),
+    }
+}
+
+#[tauri::command]
+async fn list_projects() -> Result<Vec<ProjectInfo>, String> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
+    let projects_base = format!("{}/projects", home);
+
+    let mut projects = Vec::new();
+    let categories = ["ecole", "perso", "travail"];
+
+    for category in &categories {
+        let category_path = format!("{}/{}", projects_base, category);
+        if let Ok(entries) = std::fs::read_dir(&category_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let name = path.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    // Skip hidden directories
+                    if name.starts_with('.') {
+                        continue;
+                    }
+
+                    // Check if it's a git repo
+                    let git_path = path.join(".git");
+                    let has_git = git_path.exists();
+
+                    // Check if it might be a subcategory (web, mobile, etc.)
+                    let mut is_subcategory = false;
+                    if let Ok(subentries) = std::fs::read_dir(&path) {
+                        let subdirs: Vec<_> = subentries
+                            .flatten()
+                            .filter(|e| e.path().is_dir() && !e.path().join(".git").exists())
+                            .collect();
+                        // If has subdirs and none have .git, might be subcategory
+                        if subdirs.len() > 0 && !has_git {
+                            // Scan subdirectory for projects
+                            for subentry in subdirs {
+                                let subpath = subentry.path();
+                                let subname = subpath.file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("")
+                                    .to_string();
+
+                                if subname.starts_with('.') {
+                                    continue;
+                                }
+
+                                let sub_has_git = subpath.join(".git").exists();
+
+                                projects.push(ProjectInfo {
+                                    name: subname,
+                                    path: subpath.to_string_lossy().to_string(),
+                                    category: format!("{}/{}", category, name),
+                                    has_git: sub_has_git,
+                                });
+                            }
+                            is_subcategory = true;
+                        }
+                    }
+
+                    if !is_subcategory {
+                        projects.push(ProjectInfo {
+                            name,
+                            path: path.to_string_lossy().to_string(),
+                            category: category.to_string(),
+                            has_git,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort by category then name
+    projects.sort_by(|a, b| {
+        a.category.cmp(&b.category).then(a.name.cmp(&b.name))
+    });
+
+    Ok(projects)
+}
+
 #[tauri::command]
 async fn toggle_quake_mode(window: tauri::Window) -> Result<(), String> {
     if window.is_visible().map_err(|e| e.to_string())? {
@@ -332,8 +472,201 @@ async fn set_quake_position(window: tauri::Window, height_percent: f64) -> Resul
     Ok(())
 }
 
+/// IPC response channel for MCP communication
+type IpcResponseTx = Arc<Mutex<Option<tokio::sync::oneshot::Sender<serde_json::Value>>>>;
+
+/// State for IPC communication
+struct IpcState {
+    response_tx: IpcResponseTx,
+}
+
+/// Handle IPC response from frontend
+#[tauri::command]
+async fn ipc_response(response: serde_json::Value, state: tauri::State<'_, IpcState>) -> Result<(), String> {
+    let mut tx_lock = state.response_tx.lock().await;
+    if let Some(tx) = tx_lock.take() {
+        let _ = tx.send(response);
+    }
+    Ok(())
+}
+
+/// Start IPC server for MCP communication
+fn start_ipc_server(app_handle: tauri::AppHandle, ipc_state: Arc<IpcState>) {
+    std::thread::spawn(move || {
+        #[cfg(windows)]
+        {
+            use std::net::TcpListener;
+
+            let listener = match TcpListener::bind("127.0.0.1:45892") {
+                Ok(l) => l,
+                Err(e) => {
+                    log::error!("Failed to bind IPC server: {}", e);
+                    return;
+                }
+            };
+
+            log::info!("IPC server listening on 127.0.0.1:45892");
+
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(mut stream) => {
+                        let app_handle = app_handle.clone();
+                        let ipc_state = ipc_state.clone();
+
+                        std::thread::spawn(move || {
+                            let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
+                            let mut line = String::new();
+
+                            while reader.read_line(&mut line).is_ok() && !line.is_empty() {
+                                if let Ok(request) = serde_json::from_str::<serde_json::Value>(&line) {
+                                    let action = request.get("action")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
+                                    let payload = request.get("payload").cloned().unwrap_or(json!({}));
+
+                                    // Create response channel
+                                    let (tx, rx) = tokio::sync::oneshot::channel();
+
+                                    // Store sender in state
+                                    {
+                                        let rt = tokio::runtime::Runtime::new().unwrap();
+                                        rt.block_on(async {
+                                            let mut tx_lock = ipc_state.response_tx.lock().await;
+                                            *tx_lock = Some(tx);
+                                        });
+                                    }
+
+                                    // Emit event to frontend
+                                    let _ = app_handle.emit("mcp-action", json!({
+                                        "action": action,
+                                        "payload": payload
+                                    }));
+
+                                    // Wait for response with timeout
+                                    let rt = tokio::runtime::Runtime::new().unwrap();
+                                    let response = rt.block_on(async {
+                                        tokio::time::timeout(
+                                            std::time::Duration::from_secs(30),
+                                            rx
+                                        ).await
+                                    });
+
+                                    let response_value = match response {
+                                        Ok(Ok(v)) => v,
+                                        _ => json!({"error": "Timeout or no response"}),
+                                    };
+
+                                    // Send response back
+                                    let response_str = serde_json::to_string(&response_value).unwrap();
+                                    let _ = stream.write_all(response_str.as_bytes());
+                                    let _ = stream.write_all(b"\n");
+                                    let _ = stream.flush();
+                                }
+                                line.clear();
+                            }
+                        });
+                    }
+                    Err(e) => log::error!("IPC connection error: {}", e),
+                }
+            }
+        }
+
+        #[cfg(not(windows))]
+        {
+            use std::os::unix::net::UnixListener;
+
+            let socket_path = format!(
+                "{}/wsl-terminal.sock",
+                std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string())
+            );
+
+            // Remove existing socket
+            let _ = std::fs::remove_file(&socket_path);
+
+            let listener = match UnixListener::bind(&socket_path) {
+                Ok(l) => l,
+                Err(e) => {
+                    log::error!("Failed to bind IPC server: {}", e);
+                    return;
+                }
+            };
+
+            log::info!("IPC server listening on {}", socket_path);
+
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(mut stream) => {
+                        let app_handle = app_handle.clone();
+                        let ipc_state = ipc_state.clone();
+
+                        std::thread::spawn(move || {
+                            let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
+                            let mut line = String::new();
+
+                            while reader.read_line(&mut line).is_ok() && !line.is_empty() {
+                                if let Ok(request) = serde_json::from_str::<serde_json::Value>(&line) {
+                                    let action = request.get("action")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
+                                    let payload = request.get("payload").cloned().unwrap_or(json!({}));
+
+                                    // Create response channel
+                                    let (tx, rx) = tokio::sync::oneshot::channel();
+
+                                    // Store sender in state
+                                    {
+                                        let rt = tokio::runtime::Runtime::new().unwrap();
+                                        rt.block_on(async {
+                                            let mut tx_lock = ipc_state.response_tx.lock().await;
+                                            *tx_lock = Some(tx);
+                                        });
+                                    }
+
+                                    // Emit event to frontend
+                                    let _ = app_handle.emit("mcp-action", json!({
+                                        "action": action,
+                                        "payload": payload
+                                    }));
+
+                                    // Wait for response with timeout
+                                    let rt = tokio::runtime::Runtime::new().unwrap();
+                                    let response = rt.block_on(async {
+                                        tokio::time::timeout(
+                                            std::time::Duration::from_secs(30),
+                                            rx
+                                        ).await
+                                    });
+
+                                    let response_value = match response {
+                                        Ok(Ok(v)) => v,
+                                        _ => json!({"error": "Timeout or no response"}),
+                                    };
+
+                                    // Send response back
+                                    let response_str = serde_json::to_string(&response_value).unwrap();
+                                    let _ = stream.write_all(response_str.as_bytes());
+                                    let _ = stream.write_all(b"\n");
+                                    let _ = stream.flush();
+                                }
+                                line.clear();
+                            }
+                        });
+                    }
+                    Err(e) => log::error!("IPC connection error: {}", e),
+                }
+            }
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let ipc_state = Arc::new(IpcState {
+        response_tx: Arc::new(Mutex::new(None)),
+    });
+
+    let ipc_state_clone = ipc_state.clone();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -342,6 +675,9 @@ pub fn run() {
         .manage(AppState {
             processes: Arc::new(Mutex::new(HashMap::new())),
         })
+        .manage(IpcState {
+            response_tx: ipc_state.response_tx.clone(),
+        })
         .invoke_handler(tauri::generate_handler![
             spawn_shell,
             write_to_shell,
@@ -349,10 +685,13 @@ pub fn run() {
             kill_shell,
             get_wsl_distros,
             get_git_info,
+            get_docker_status,
+            list_projects,
             toggle_quake_mode,
-            set_quake_position
+            set_quake_position,
+            ipc_response
         ])
-        .setup(|app| {
+        .setup(move |app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -361,8 +700,12 @@ pub fn run() {
                 )?;
             }
 
+            // Start IPC server for MCP communication
+            start_ipc_server(app.handle().clone(), ipc_state_clone.clone());
+
             if let Some(window) = app.get_webview_window("main") {
                 log::info!("WSL Terminal started successfully");
+                log::info!("MCP IPC server started");
                 let _ = window.show();
             }
 
