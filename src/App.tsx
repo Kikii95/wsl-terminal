@@ -2,11 +2,15 @@ import { useEffect } from "react";
 import { TitleBar } from "@/components/TitleBar";
 import { TabBar } from "@/components/TabBar";
 import { Terminal } from "@/components/Terminal";
+import { StatusBar } from "@/components/StatusBar";
 import { useTerminalStore } from "@/stores/terminalStore";
+import { useConfigStore } from "@/stores/configStore";
+import { getTheme } from "@/config/themes";
 
 function App() {
-  const { tabs, activeTabId, addTab, removeTab, setActiveTab } =
-    useTerminalStore();
+  const { tabs, activeTabId, addTab, removeTab, setActiveTab } = useTerminalStore();
+  const { appearance } = useConfigStore();
+  const theme = getTheme(appearance.theme);
 
   // Create initial tab on mount
   useEffect(() => {
@@ -65,35 +69,76 @@ function App() {
   }, [tabs, activeTabId, addTab, removeTab, setActiveTab]);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div
+      className="h-screen flex flex-col overflow-hidden"
+      style={{ backgroundColor: theme.background }}
+    >
       <TitleBar />
       <TabBar />
-      <div className="flex-1 overflow-hidden">
-        {tabs.map((tab) => (
-          <Terminal
-            key={tab.id}
-            tabId={tab.id}
-            shell={tab.shell}
-            isActive={tab.id === activeTabId}
-          />
-        ))}
+
+      {/* Terminal Area with padding */}
+      <div className="flex-1 overflow-hidden relative p-2">
+        <div className="h-full w-full rounded-lg overflow-hidden border border-[#313244]/50">
+          {tabs.map((tab) => (
+            <Terminal
+              key={tab.id}
+              tabId={tab.id}
+              shell={tab.shell}
+              distro={tab.distro}
+              isActive={tab.id === activeTabId}
+            />
+          ))}
+
+        {/* Empty State */}
         {tabs.length === 0 && (
-          <div className="h-full flex items-center justify-center text-[var(--text-secondary)]">
-            <div className="text-center">
-              <p className="mb-4">No terminals open</p>
-              <button
-                className="
-                  px-4 py-2 rounded bg-[var(--accent)] text-[var(--bg-primary)]
-                  hover:bg-[var(--accent-hover)] transition-colors
-                "
-                onClick={() => addTab()}
+          <div className="h-full flex flex-col items-center justify-center text-[#6c7086]">
+            <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-2xl bg-gradient-to-br from-[#89b4fa]/20 to-[#cba6f7]/20">
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#89b4fa"
+                strokeWidth="2"
               >
-                New Terminal
-              </button>
+                <polyline points="4 17 10 11 4 5" />
+                <line x1="12" y1="19" x2="20" y2="19" />
+              </svg>
             </div>
+            <p className="text-lg font-medium text-[#cdd6f4] mb-2">
+              No terminals open
+            </p>
+            <p className="text-sm mb-6">
+              Press{" "}
+              <kbd className="px-2 py-1 bg-[#313244] rounded text-[#cdd6f4] font-mono text-xs">
+                Ctrl+Shift+T
+              </kbd>{" "}
+              to open a new terminal
+            </p>
+            <button
+              className="
+                flex items-center gap-2 px-4 py-2.5 rounded-lg
+                bg-[#89b4fa] text-[#1e1e2e] font-medium
+                hover:bg-[#b4befe] transition-colors duration-150
+              "
+              onClick={() => addTab()}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <path
+                  d="M8 2v12M2 8h12"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              New Terminal
+            </button>
           </div>
         )}
+        </div>
       </div>
+
+      <StatusBar />
     </div>
   );
 }

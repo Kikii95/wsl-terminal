@@ -1,90 +1,158 @@
-use std::process::Stdio;
-use tauri::{Manager, Emitter};
-use tokio::io::{AsyncWriteExt, BufReader};
-use tokio::process::{Child, Command};
+use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use std::collections::HashMap;
+use std::io::{Read, Write};
 use std::sync::Arc;
+use tauri::{Emitter, Manager};
 use tokio::sync::Mutex;
 
-// Store for active shell processes
-struct ShellState {
-    processes: Arc<Mutex<std::collections::HashMap<String, ShellProcess>>>,
+struct PtyProcess {
+    writer: Box<dyn Write + Send>,
+    _pair: portable_pty::PtyPair,
 }
 
-struct ShellProcess {
-    stdin: tokio::process::ChildStdin,
-    _child: Child,
+struct AppState {
+    processes: Arc<Mutex<HashMap<String, PtyProcess>>>,
+}
+
+#[tauri::command]
+async fn get_wsl_distros() -> Result<Vec<String>, String> {
+    let output = std::process::Command::new("wsl.exe")
+        .args(["--list", "--quiet"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    // WSL outputs UTF-16LE, need to decode properly
+    let stdout = if output.stdout.len() >= 2 && output.stdout[0] == 0xFF && output.stdout[1] == 0xFE {
+        // Has BOM, skip it
+        String::from_utf16_lossy(
+            &output.stdout[2..]
+                .chunks(2)
+                .filter_map(|c| {
+                    if c.len() == 2 {
+                        Some(u16::from_le_bytes([c[0], c[1]]))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<u16>>()
+        )
+    } else {
+        // Try UTF-16LE without BOM
+        String::from_utf16_lossy(
+            &output.stdout
+                .chunks(2)
+                .filter_map(|c| {
+                    if c.len() == 2 {
+                        Some(u16::from_le_bytes([c[0], c[1]]))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<u16>>()
+        )
+    };
+
+    let distros: Vec<String> = stdout
+        .lines()
+        .map(|s| s.trim().replace("\u{0}", "").to_string())
+        .filter(|s| !s.is_empty() && !s.contains("docker-desktop"))
+        .collect();
+
+    Ok(distros)
 }
 
 #[tauri::command]
 async fn spawn_shell(
     tab_id: String,
     shell: String,
-    state: tauri::State<'_, ShellState>,
+    distro: Option<String>,
+    state: tauri::State<'_, AppState>,
     window: tauri::Window,
 ) -> Result<(), String> {
-    let (cmd, args): (&str, Vec<&str>) = match shell.as_str() {
-        "wsl" => ("wsl", vec!["-e", "bash", "-l"]),
-        "powershell" => ("powershell", vec!["-NoLogo"]),
-        "cmd" => ("cmd", vec!["/K"]),
-        _ => ("wsl", vec!["-e", "bash", "-l"]),
+    let pty_system = native_pty_system();
+
+    let pair = pty_system
+        .openpty(PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| format!("Failed to open PTY: {}", e))?;
+
+    // Get Windows user profile for proper CWD
+    let userprofile = std::env::var("USERPROFILE")
+        .unwrap_or_else(|_| "C:\\Users\\Public".to_string());
+
+    let cmd = match shell.as_str() {
+        "wsl" => {
+            let mut c = CommandBuilder::new("wsl.exe");
+            if let Some(d) = &distro {
+                c.args(["-d", d]);
+            }
+            // Start WSL in home directory
+            c.args(["--cd", "~"]);
+            c
+        }
+        "powershell" => {
+            let mut c = CommandBuilder::new("powershell.exe");
+            c.args(["-NoLogo", "-NoExit"]);
+            c.cwd(&userprofile);
+            c
+        }
+        "cmd" => {
+            let mut c = CommandBuilder::new("cmd.exe");
+            c.cwd(&userprofile);
+            c
+        }
+        _ => {
+            let mut c = CommandBuilder::new("wsl.exe");
+            if let Some(d) = &distro {
+                c.args(["-d", d]);
+            }
+            c.args(["--cd", "~"]);
+            c
+        }
     };
 
-    let mut child = Command::new(cmd)
-        .args(&args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to spawn shell: {}", e))?;
+    let _child = pair
+        .slave
+        .spawn_command(cmd)
+        .map_err(|e| format!("Failed to spawn: {}", e))?;
 
-    let stdin = child.stdin.take().ok_or("Failed to get stdin")?;
-    let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
-    let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
+    let writer = pair
+        .master
+        .take_writer()
+        .map_err(|e| format!("Failed to get writer: {}", e))?;
 
-    // Store the process
+    let mut reader = pair
+        .master
+        .try_clone_reader()
+        .map_err(|e| format!("Failed to get reader: {}", e))?;
+
+    // Store writer
     {
         let mut processes = state.processes.lock().await;
         processes.insert(
             tab_id.clone(),
-            ShellProcess {
-                stdin,
-                _child: child,
+            PtyProcess {
+                writer,
+                _pair: pair,
             },
         );
     }
 
-    // Read stdout in a separate task
-    let tab_id_stdout = tab_id.clone();
-    let window_stdout = window.clone();
-    tokio::spawn(async move {
-        let mut reader = BufReader::new(stdout);
-        let mut buffer = vec![0u8; 4096];
-
+    // Read output in background thread
+    let tab_id_clone = tab_id.clone();
+    let window_clone = window.clone();
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 4096];
         loop {
-            match tokio::io::AsyncReadExt::read(&mut reader, &mut buffer).await {
-                Ok(0) => break, // EOF
-                Ok(n) => {
-                    let data = String::from_utf8_lossy(&buffer[..n]).to_string();
-                    let _ = window_stdout.emit(&format!("shell-output-{}", tab_id_stdout), data);
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    // Read stderr in a separate task
-    let tab_id_stderr = tab_id.clone();
-    let window_stderr = window.clone();
-    tokio::spawn(async move {
-        let mut reader = BufReader::new(stderr);
-        let mut buffer = vec![0u8; 4096];
-
-        loop {
-            match tokio::io::AsyncReadExt::read(&mut reader, &mut buffer).await {
+            match reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    let data = String::from_utf8_lossy(&buffer[..n]).to_string();
-                    let _ = window_stderr.emit(&format!("shell-output-{}", tab_id_stderr), data);
+                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                    let _ = window_clone.emit(&format!("shell-output-{}", tab_id_clone), &data);
                 }
                 Err(_) => break,
             }
@@ -98,31 +166,47 @@ async fn spawn_shell(
 async fn write_to_shell(
     tab_id: String,
     data: String,
-    state: tauri::State<'_, ShellState>,
+    state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let mut processes = state.processes.lock().await;
-
     if let Some(process) = processes.get_mut(&tab_id) {
         process
-            .stdin
+            .writer
             .write_all(data.as_bytes())
-            .await
-            .map_err(|e| format!("Failed to write to shell: {}", e))?;
+            .map_err(|e| format!("Write failed: {}", e))?;
         process
-            .stdin
+            .writer
             .flush()
-            .await
-            .map_err(|e| format!("Failed to flush: {}", e))?;
+            .map_err(|e| format!("Flush failed: {}", e))?;
     }
-
     Ok(())
 }
 
 #[tauri::command]
-async fn kill_shell(
+async fn resize_pty(
     tab_id: String,
-    state: tauri::State<'_, ShellState>,
+    cols: u16,
+    rows: u16,
+    state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
+    let processes = state.processes.lock().await;
+    if let Some(process) = processes.get(&tab_id) {
+        process
+            ._pair
+            .master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("Resize failed: {}", e))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn kill_shell(tab_id: String, state: tauri::State<'_, AppState>) -> Result<(), String> {
     let mut processes = state.processes.lock().await;
     processes.remove(&tab_id);
     Ok(())
@@ -132,13 +216,15 @@ async fn kill_shell(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .manage(ShellState {
-            processes: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        .manage(AppState {
+            processes: Arc::new(Mutex::new(HashMap::new())),
         })
         .invoke_handler(tauri::generate_handler![
             spawn_shell,
             write_to_shell,
-            kill_shell
+            resize_pty,
+            kill_shell,
+            get_wsl_distros
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

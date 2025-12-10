@@ -2,7 +2,9 @@ export interface Tab {
   id: string;
   title: string;
   shell: string;
+  distro?: string;
   cwd?: string;
+  color?: string;
 }
 
 export interface TerminalTheme {

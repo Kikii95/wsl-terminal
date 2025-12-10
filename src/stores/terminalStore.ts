@@ -4,25 +4,53 @@ import type { Tab } from "@/types/terminal";
 interface TerminalState {
   tabs: Tab[];
   activeTabId: string | null;
+  wslDistros: string[];
 
   // Actions
-  addTab: (shell?: string) => void;
+  addTab: (shell?: string, distro?: string) => void;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTabTitle: (id: string, title: string) => void;
+  updateTabColor: (id: string, color: string) => void;
+  setWslDistros: (distros: string[]) => void;
 }
 
 const generateId = () => crypto.randomUUID();
 
+const TAB_COLORS = [
+  "#f38ba8", // red
+  "#a6e3a1", // green
+  "#f9e2af", // yellow
+  "#89b4fa", // blue
+  "#cba6f7", // purple
+  "#94e2d5", // teal
+  "#fab387", // peach
+  "#f5c2e7", // pink
+];
+
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   tabs: [],
   activeTabId: null,
+  wslDistros: [],
 
-  addTab: (shell = "wsl") => {
+  addTab: (shell = "wsl", distro?: string) => {
+    const { tabs } = get();
+    let title = "Terminal";
+
+    if (shell === "wsl") {
+      title = distro || "WSL";
+    } else if (shell === "powershell") {
+      title = "PowerShell";
+    } else if (shell === "cmd") {
+      title = "CMD";
+    }
+
     const newTab: Tab = {
       id: generateId(),
-      title: shell === "wsl" ? "WSL" : shell,
+      title,
       shell,
+      distro,
+      color: TAB_COLORS[tabs.length % TAB_COLORS.length],
     };
 
     set((state) => ({
@@ -61,5 +89,17 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         tab.id === id ? { ...tab, title } : tab
       ),
     }));
+  },
+
+  updateTabColor: (id: string, color: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === id ? { ...tab, color } : tab
+      ),
+    }));
+  },
+
+  setWslDistros: (distros: string[]) => {
+    set({ wslDistros: distros });
   },
 }));

@@ -11,15 +11,17 @@ import "@xterm/xterm/css/xterm.css";
 interface TerminalProps {
   tabId: string;
   shell: string;
+  distro?: string;
   isActive: boolean;
 }
 
-export function Terminal({ tabId, shell, isActive }: TerminalProps) {
+export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
   const shellSpawnedRef = useRef(false);
+  const resizeTimeoutRef = useRef<number | null>(null);
 
   const { appearance } = useConfigStore();
   const theme = getTheme(appearance.theme);
@@ -30,6 +32,17 @@ export function Terminal({ tabId, shell, isActive }: TerminalProps) {
         await invoke("write_to_shell", { tabId, data });
       } catch (error) {
         console.error("Failed to write to shell:", error);
+      }
+    },
+    [tabId]
+  );
+
+  const resizePty = useCallback(
+    async (cols: number, rows: number) => {
+      try {
+        await invoke("resize_pty", { tabId, cols, rows });
+      } catch (error) {
+        console.error("Failed to resize PTY:", error);
       }
     },
     [tabId]
@@ -56,7 +69,11 @@ export function Terminal({ tabId, shell, isActive }: TerminalProps) {
     xterm.loadAddon(webLinksAddon);
 
     xterm.open(terminalRef.current);
-    fitAddon.fit();
+
+    // Initial fit
+    setTimeout(() => {
+      fitAddon.fit();
+    }, 0);
 
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
@@ -64,6 +81,11 @@ export function Terminal({ tabId, shell, isActive }: TerminalProps) {
     // Handle user input
     xterm.onData((data) => {
       writeToShell(data);
+    });
+
+    // Handle resize
+    xterm.onResize(({ cols, rows }) => {
+      resizePty(cols, rows);
     });
 
     // Listen for shell output
@@ -83,7 +105,16 @@ export function Terminal({ tabId, shell, isActive }: TerminalProps) {
       shellSpawnedRef.current = true;
 
       try {
-        await invoke("spawn_shell", { tabId, shell });
+        await invoke("spawn_shell", { tabId, shell, distro: distro || null });
+
+        // Resize after spawn
+        setTimeout(() => {
+          fitAddon.fit();
+          const dims = fitAddon.proposeDimensions();
+          if (dims) {
+            resizePty(dims.cols, dims.rows);
+          }
+        }, 100);
       } catch (error) {
         console.error("Failed to spawn shell:", error);
         xterm.writeln(`\x1b[31mFailed to spawn shell: ${error}\x1b[0m`);
@@ -92,14 +123,37 @@ export function Terminal({ tabId, shell, isActive }: TerminalProps) {
     };
     spawnShell();
 
-    // Handle resize
+    // Handle window resize with debounce
     const handleResize = () => {
-      fitAddon.fit();
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+      resizeTimeoutRef.current = window.setTimeout(() => {
+        if (fitAddonRef.current && xtermRef.current) {
+          fitAddonRef.current.fit();
+          const dims = fitAddonRef.current.proposeDimensions();
+          if (dims) {
+            resizePty(dims.cols, dims.rows);
+          }
+        }
+      }, 50);
     };
     window.addEventListener("resize", handleResize);
 
+    // Also observe container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    if (terminalRef.current) {
+      resizeObserver.observe(terminalRef.current);
+    }
+
     return () => {
       window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
       if (unlistenRef.current) {
         unlistenRef.current();
       }
@@ -108,15 +162,24 @@ export function Terminal({ tabId, shell, isActive }: TerminalProps) {
       xtermRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [tabId, shell, writeToShell, theme, appearance]);
+  }, [tabId, shell, distro, writeToShell, resizePty]);
 
   // Focus terminal when tab becomes active
   useEffect(() => {
     if (isActive && xtermRef.current) {
       xtermRef.current.focus();
-      fitAddonRef.current?.fit();
+      // Delay fit to ensure container is visible and sized
+      setTimeout(() => {
+        if (fitAddonRef.current) {
+          fitAddonRef.current.fit();
+          const dims = fitAddonRef.current.proposeDimensions();
+          if (dims) {
+            resizePty(dims.cols, dims.rows);
+          }
+        }
+      }, 50);
     }
-  }, [isActive]);
+  }, [isActive, resizePty]);
 
   // Update theme when it changes
   useEffect(() => {
