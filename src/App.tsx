@@ -10,6 +10,7 @@ import { QuickCommands } from "@/components/QuickCommands";
 import { ProjectSwitcher } from "@/components/ProjectSwitcher";
 import { SSHSidebar } from "@/components/SSHSidebar";
 import { ToastContainer } from "@/components/ToastContainer";
+import { WorkspaceManager } from "@/components/WorkspaceManager";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useConfigStore } from "@/stores/configStore";
 import { usePaneStore } from "@/stores/paneStore";
@@ -38,6 +39,7 @@ function App() {
   const [showQuickCommands, setShowQuickCommands] = useState(false);
   const [showProjectSwitcher, setShowProjectSwitcher] = useState(false);
   const [showSSHSidebar, setShowSSHSidebar] = useState(false);
+  const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
 
   // Initialize quake mode
   useQuakeMode();
@@ -186,6 +188,12 @@ function App() {
       if (e.ctrlKey && e.shiftKey && e.key === "O") {
         e.preventDefault();
         setShowProjectSwitcher(true);
+      }
+
+      // Ctrl+Shift+L: Workspace Manager
+      if (e.ctrlKey && e.shiftKey && e.key === "L") {
+        e.preventDefault();
+        setShowWorkspaceManager(true);
       }
     };
 
@@ -349,6 +357,12 @@ function App() {
         <SSHSidebar
           isOpen={showSSHSidebar}
           onClose={() => setShowSSHSidebar(false)}
+        />
+
+        {/* Workspace Manager */}
+        <WorkspaceManager
+          isOpen={showWorkspaceManager}
+          onClose={() => setShowWorkspaceManager(false)}
         />
 
         {/* Toast Notifications */}

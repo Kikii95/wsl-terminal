@@ -6,6 +6,8 @@ import { useConfigStore } from "@/stores/configStore";
 import { usePaneStore } from "@/stores/paneStore";
 import { useSSHStore } from "@/stores/sshStore";
 import { useToastStore } from "@/stores/toastStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useSuggestionStore } from "@/stores/suggestionStore";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface McpActionPayload {
@@ -27,6 +29,8 @@ export function useMcpHandler() {
   const { addToast } = useToastStore();
   const { panes, splitPane } = usePaneStore();
   const { connections, addConnection, removeConnection } = useSSHStore();
+  const { workspaces, saveWorkspace, deleteWorkspace, getWorkspace } = useWorkspaceStore();
+  const { enabled: suggestionsEnabled, getSuggestions, recentCommands } = useSuggestionStore();
 
   const handleMcpAction = useCallback(
     async (event: McpActionPayload) => {
@@ -258,6 +262,85 @@ export function useMcpHandler() {
             break;
           }
 
+          case "save_workspace": {
+            const name = payload.name as string;
+            if (name && tabs.length > 0) {
+              const id = saveWorkspace(name, tabs);
+              response = { success: true, id, tabs_count: tabs.length };
+            } else if (!name) {
+              response = { success: false, error: "Workspace name required" };
+            } else {
+              response = { success: false, error: "No tabs to save" };
+            }
+            break;
+          }
+
+          case "load_workspace": {
+            const id = payload.id as string;
+            const workspace = getWorkspace(id);
+            if (workspace) {
+              // Close all current tabs
+              tabs.forEach((tab) => removeTab(tab.id));
+              // Open tabs from workspace
+              workspace.tabs.forEach((savedTab) => {
+                addTab(savedTab.shell, savedTab.distro, savedTab.cwd);
+              });
+              response = { success: true, loaded_tabs: workspace.tabs.length };
+            } else {
+              response = { success: false, error: "Workspace not found" };
+            }
+            break;
+          }
+
+          case "list_workspaces": {
+            response = {
+              workspaces: workspaces.map((w) => ({
+                id: w.id,
+                name: w.name,
+                tabs_count: w.tabs.length,
+                saved_at: new Date(w.savedAt).toISOString(),
+              })),
+            };
+            break;
+          }
+
+          case "delete_workspace": {
+            const id = payload.id as string;
+            if (id && getWorkspace(id)) {
+              deleteWorkspace(id);
+              response = { success: true };
+            } else {
+              response = { success: false, error: "Workspace not found" };
+            }
+            break;
+          }
+
+          case "suggest_command": {
+            const input = payload.input as string;
+            if (input) {
+              const suggestions = getSuggestions(input);
+              response = {
+                suggestions: suggestions.map((s) => ({
+                  id: s.id,
+                  command: s.command,
+                  description: s.description,
+                  category: s.category,
+                })),
+                enabled: suggestionsEnabled,
+              };
+            } else {
+              response = { success: false, error: "Input required" };
+            }
+            break;
+          }
+
+          case "get_recent_commands": {
+            response = {
+              recent_commands: recentCommands.slice(0, 20),
+            };
+            break;
+          }
+
           default:
             response = { error: `Unknown action: ${action}` };
         }
@@ -283,6 +366,13 @@ export function useMcpHandler() {
       splitPane,
       reorderTabs,
       addToast,
+      workspaces,
+      saveWorkspace,
+      deleteWorkspace,
+      getWorkspace,
+      suggestionsEnabled,
+      getSuggestions,
+      recentCommands,
     ]
   );
 
