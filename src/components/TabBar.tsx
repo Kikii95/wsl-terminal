@@ -101,8 +101,9 @@ export function TabBar() {
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.15 }}
                   className={cn(
-                    "group relative flex items-center gap-2 h-8 px-3 rounded-lg cursor-pointer transition-all",
+                    "group relative flex items-center gap-2 h-8 rounded-lg cursor-pointer transition-all",
                     "min-w-[120px] max-w-[180px]",
+                    tabColor !== "transparent" ? "pl-4 pr-3" : "px-3",
                     isActive
                       ? "bg-background shadow-sm"
                       : "hover:bg-secondary/50"
@@ -126,12 +127,9 @@ export function TabBar() {
                     />
                   )}
 
-                  {/* Shell icon - with left padding for color indicator */}
+                  {/* Shell icon */}
                   <ShellIcon
-                    className={cn(
-                      "w-3.5 h-3.5 flex-shrink-0",
-                      tabColor !== "transparent" ? "ml-3" : ""
-                    )}
+                    className="w-3.5 h-3.5 flex-shrink-0"
                     style={{ color: isActive ? config.color : "currentColor" }}
                   />
 

@@ -16,9 +16,10 @@ import { useTheme } from "@/App";
 interface SSHSidebarProps {
   isOpen: boolean;
   onToggle: () => void;
+  onClose: () => void;
 }
 
-export function SSHSidebar({ isOpen, onToggle }: SSHSidebarProps) {
+export function SSHSidebar({ isOpen, onToggle, onClose }: SSHSidebarProps) {
   const theme = useTheme();
   const { connections, addConnection, removeConnection } = useSSHStore();
   const { addTab } = useTerminalStore();
@@ -68,90 +69,166 @@ export function SSHSidebar({ isOpen, onToggle }: SSHSidebarProps) {
         )}
       </button>
 
+      {/* Overlay backdrop for click-outside */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-30"
+            onClick={onClose}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ x: -280, opacity: 0 }}
+            initial={{ x: -300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -280, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed left-0 top-[72px] bottom-6 w-64 z-40 flex flex-col"
+            exit={{ x: -300, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="fixed left-0 top-[80px] bottom-8 w-72 z-40 flex flex-col rounded-r-xl shadow-2xl"
             style={{
               backgroundColor: theme.ui.surface,
               borderRight: `1px solid ${theme.ui.border}`,
+              borderTop: `1px solid ${theme.ui.border}`,
+              borderBottom: `1px solid ${theme.ui.border}`,
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div
-              className="flex items-center justify-between px-4 py-3 border-b"
+              className="flex items-center justify-between px-5 py-4 border-b"
               style={{ borderColor: theme.ui.border }}
             >
-              <div className="flex items-center gap-2">
-                <Server className="w-4 h-4" style={{ color: theme.ui.accent }} />
-                <span className="font-medium text-sm" style={{ color: theme.ui.text }}>
-                  SSH Manager
-                </span>
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: `${theme.ui.accent}20` }}
+                >
+                  <Server className="w-4 h-4" style={{ color: theme.ui.accent }} />
+                </div>
+                <div>
+                  <span className="font-semibold text-sm block" style={{ color: theme.ui.text }}>
+                    SSH Manager
+                  </span>
+                  <span className="text-[10px]" style={{ color: theme.ui.textMuted }}>
+                    {connections.length} connection{connections.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
               </div>
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="p-1 rounded hover:bg-secondary/50 transition-colors"
-                style={{ color: theme.ui.textMuted }}
-                title="Add connection"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="p-2 rounded-lg hover:bg-secondary/50 transition-colors"
+                  style={{ color: theme.ui.accent }}
+                  title="Add connection"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded-lg hover:bg-secondary/50 transition-colors"
+                  style={{ color: theme.ui.textMuted }}
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Connection List */}
-            <div className="flex-1 overflow-y-auto py-2">
+            <div className="flex-1 overflow-y-auto p-3">
               {connections.length === 0 ? (
                 <div
-                  className="px-4 py-8 text-center text-sm"
+                  className="flex flex-col items-center justify-center h-full text-center px-4"
                   style={{ color: theme.ui.textMuted }}
                 >
-                  <Server className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p>No SSH connections</p>
-                  <p className="text-xs mt-1">Click + to add one</p>
+                  <div
+                    className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+                    style={{ backgroundColor: `${theme.ui.border}40` }}
+                  >
+                    <Server className="w-8 h-8 opacity-40" />
+                  </div>
+                  <p className="font-medium text-sm mb-1" style={{ color: theme.ui.text }}>
+                    No connections yet
+                  </p>
+                  <p className="text-xs mb-4">Add your first SSH connection</p>
+                  <button
+                    onClick={() => setShowAddForm(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors"
+                    style={{
+                      backgroundColor: theme.ui.accent,
+                      color: theme.ui.background,
+                    }}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Connection
+                  </button>
                 </div>
               ) : (
-                connections.map((conn) => (
-                  <div
-                    key={conn.id}
-                    className="flex items-center gap-2 px-3 py-2 mx-2 rounded-lg hover:bg-secondary/30 group transition-colors"
-                    style={{ color: theme.ui.text }}
-                  >
-                    <Server className="w-4 h-4 flex-shrink-0" style={{ color: theme.ui.accent }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{conn.name}</div>
+                <div className="space-y-2">
+                  {connections.map((conn) => (
+                    <div
+                      key={conn.id}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/30 group transition-all cursor-pointer"
+                      style={{ color: theme.ui.text }}
+                      onClick={() => handleConnect(conn)}
+                    >
                       <div
-                        className="text-xs truncate"
-                        style={{ color: theme.ui.textMuted }}
+                        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${theme.green}20` }}
                       >
-                        {conn.user}@{conn.host}:{conn.port}
+                        <Server className="w-5 h-5" style={{ color: theme.green }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{conn.name}</div>
+                        <div
+                          className="text-xs truncate font-mono"
+                          style={{ color: theme.ui.textMuted }}
+                        >
+                          {conn.user}@{conn.host}:{conn.port}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleConnect(conn);
+                          }}
+                          className="p-2 rounded-lg hover:bg-secondary/50"
+                          title="Connect"
+                          style={{ color: theme.green }}
+                        >
+                          <Play className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeConnection(conn.id);
+                          }}
+                          className="p-2 rounded-lg hover:bg-destructive/20"
+                          title="Remove"
+                          style={{ color: theme.red }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => handleConnect(conn)}
-                        className="p-1 rounded hover:bg-secondary/50"
-                        title="Connect"
-                        style={{ color: theme.green }}
-                      >
-                        <Play className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => removeConnection(conn.id)}
-                        className="p-1 rounded hover:bg-secondary/50"
-                        title="Remove"
-                        style={{ color: theme.red }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
+            </div>
+
+            {/* Footer hint */}
+            <div
+              className="px-5 py-3 text-[10px] border-t"
+              style={{ borderColor: theme.ui.border, color: theme.ui.textMuted }}
+            >
+              Click outside or press Esc to close
             </div>
 
             {/* Add Form Modal */}
@@ -161,82 +238,111 @@ export function SSHSidebar({ isOpen, onToggle }: SSHSidebarProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 bg-black/50 flex items-center justify-center p-4"
+                  className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5 rounded-r-xl"
+                  onClick={() => setShowAddForm(false)}
                 >
                   <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    className="w-full max-w-sm rounded-lg p-4"
+                    initial={{ scale: 0.9, opacity: 0, y: 10 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.9, opacity: 0, y: 10 }}
+                    className="w-full rounded-xl p-5 shadow-xl"
                     style={{
                       backgroundColor: theme.ui.surface,
                       border: `1px solid ${theme.ui.border}`,
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-medium" style={{ color: theme.ui.text }}>
-                        New SSH Connection
-                      </h3>
+                    <div className="flex items-center justify-between mb-5">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center"
+                          style={{ backgroundColor: `${theme.ui.accent}20` }}
+                        >
+                          <Plus className="w-4 h-4" style={{ color: theme.ui.accent }} />
+                        </div>
+                        <h3 className="font-semibold" style={{ color: theme.ui.text }}>
+                          New Connection
+                        </h3>
+                      </div>
                       <button
                         onClick={() => setShowAddForm(false)}
-                        className="p-1 rounded hover:bg-secondary/50"
+                        className="p-2 rounded-lg hover:bg-secondary/50"
                         style={{ color: theme.ui.textMuted }}
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
 
-                    <div className="space-y-3">
-                      <input
-                        type="text"
-                        placeholder="Connection name"
-                        value={newConn.name}
-                        onChange={(e) => setNewConn({ ...newConn, name: e.target.value })}
-                        className="w-full px-3 py-2 rounded text-sm bg-background border outline-none focus:ring-1"
-                        style={{
-                          borderColor: theme.ui.border,
-                          color: theme.ui.text,
-                        }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Host"
-                        value={newConn.host}
-                        onChange={(e) => setNewConn({ ...newConn, host: e.target.value })}
-                        className="w-full px-3 py-2 rounded text-sm bg-background border outline-none focus:ring-1"
-                        style={{
-                          borderColor: theme.ui.border,
-                          color: theme.ui.text,
-                        }}
-                      />
-                      <div className="flex gap-2">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-xs font-medium mb-1.5 block" style={{ color: theme.ui.textMuted }}>
+                          Connection Name
+                        </label>
                         <input
                           type="text"
-                          placeholder="User"
-                          value={newConn.user}
-                          onChange={(e) => setNewConn({ ...newConn, user: e.target.value })}
-                          className="flex-1 px-3 py-2 rounded text-sm bg-background border outline-none focus:ring-1"
-                          style={{
-                            borderColor: theme.ui.border,
-                            color: theme.ui.text,
-                          }}
-                        />
-                        <input
-                          type="number"
-                          placeholder="Port"
-                          value={newConn.port}
-                          onChange={(e) => setNewConn({ ...newConn, port: parseInt(e.target.value) || 22 })}
-                          className="w-20 px-3 py-2 rounded text-sm bg-background border outline-none focus:ring-1"
+                          placeholder="My Server"
+                          value={newConn.name}
+                          onChange={(e) => setNewConn({ ...newConn, name: e.target.value })}
+                          className="w-full px-4 py-2.5 rounded-lg text-sm bg-background border outline-none focus:ring-2 transition-all"
                           style={{
                             borderColor: theme.ui.border,
                             color: theme.ui.text,
                           }}
                         />
                       </div>
+                      <div>
+                        <label className="text-xs font-medium mb-1.5 block" style={{ color: theme.ui.textMuted }}>
+                          Host
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="192.168.1.100 or example.com"
+                          value={newConn.host}
+                          onChange={(e) => setNewConn({ ...newConn, host: e.target.value })}
+                          className="w-full px-4 py-2.5 rounded-lg text-sm bg-background border outline-none focus:ring-2 transition-all"
+                          style={{
+                            borderColor: theme.ui.border,
+                            color: theme.ui.text,
+                          }}
+                        />
+                      </div>
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <label className="text-xs font-medium mb-1.5 block" style={{ color: theme.ui.textMuted }}>
+                            Username
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="root"
+                            value={newConn.user}
+                            onChange={(e) => setNewConn({ ...newConn, user: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-lg text-sm bg-background border outline-none focus:ring-2 transition-all"
+                            style={{
+                              borderColor: theme.ui.border,
+                              color: theme.ui.text,
+                            }}
+                          />
+                        </div>
+                        <div className="w-24">
+                          <label className="text-xs font-medium mb-1.5 block" style={{ color: theme.ui.textMuted }}>
+                            Port
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="22"
+                            value={newConn.port}
+                            onChange={(e) => setNewConn({ ...newConn, port: parseInt(e.target.value) || 22 })}
+                            className="w-full px-4 py-2.5 rounded-lg text-sm bg-background border outline-none focus:ring-2 transition-all"
+                            style={{
+                              borderColor: theme.ui.border,
+                              color: theme.ui.text,
+                            }}
+                          />
+                        </div>
+                      </div>
                       <button
                         onClick={handleAddConnection}
-                        className="w-full py-2 rounded font-medium text-sm transition-colors"
+                        className="w-full py-3 rounded-lg font-medium text-sm transition-all hover:brightness-110"
                         style={{
                           backgroundColor: theme.ui.accent,
                           color: theme.ui.background,

@@ -312,6 +312,7 @@ function App() {
         <SSHSidebar
           isOpen={showSSHSidebar}
           onToggle={() => setShowSSHSidebar(!showSSHSidebar)}
+          onClose={() => setShowSSHSidebar(false)}
         />
       </div>
     </ThemeContext.Provider>
