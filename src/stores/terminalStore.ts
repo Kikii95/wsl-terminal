@@ -14,6 +14,7 @@ interface TerminalState {
   updateTabColor: (id: string, color: string) => void;
   setWslDistros: (distros: string[]) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
+  setTabs: (tabs: Tab[]) => void;
 }
 
 const generateId = () => crypto.randomUUID();
@@ -124,5 +125,9 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
       return { tabs: newTabs };
     });
+  },
+
+  setTabs: (tabs: Tab[]) => {
+    set({ tabs });
   },
 }));

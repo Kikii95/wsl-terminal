@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { Plus, X, Settings, Terminal, Cpu, Hash, ChevronDown } from "lucide-react";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { SettingsModal } from "./SettingsModal";
@@ -34,7 +34,7 @@ export function TabBar() {
     updateTabTitle,
     updateTabColor,
     setWslDistros,
-    reorderTabs,
+    setTabs,
   } = useTerminalStore();
 
   const [showNewTabMenu, setShowNewTabMenu] = useState(false);
@@ -42,8 +42,6 @@ export function TabBar() {
   const [editValue, setEditValue] = useState("");
   const [contextMenu, setContextMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchDistros = async () => {
@@ -83,76 +81,42 @@ export function TabBar() {
     setContextMenu({ tabId, x: e.clientX, y: e.clientY });
   };
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", index.toString());
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (draggedIndex !== null && draggedIndex !== index) {
-      setDropTargetIndex(index);
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDropTargetIndex(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, toIndex: number) => {
-    e.preventDefault();
-    if (draggedIndex !== null && draggedIndex !== toIndex) {
-      reorderTabs(draggedIndex, toIndex);
-    }
-    setDraggedIndex(null);
-    setDropTargetIndex(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDropTargetIndex(null);
-  };
-
   return (
     <>
       <div className="flex items-center h-10 bg-card/50 border-b border-border px-2">
         {/* Tabs Container */}
-        <div className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-none py-1">
+        <Reorder.Group
+          axis="x"
+          values={tabs}
+          onReorder={setTabs}
+          className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-none py-1"
+        >
           <AnimatePresence mode="popLayout">
-            {tabs.map((tab, index) => {
+            {tabs.map((tab) => {
               const isActive = tab.id === activeTabId;
               const config = shellConfig[tab.shell] || shellConfig.wsl;
               const ShellIcon = config.icon;
               const tabColor = tab.color || "transparent";
-              const isDragging = draggedIndex === index;
-              const isDropTarget = dropTargetIndex === index;
 
               return (
-                <motion.div
+                <Reorder.Item
                   key={tab.id}
-                  layout
+                  value={tab}
                   initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{
-                    opacity: isDragging ? 0.5 : 1,
-                    scale: isDragging ? 0.95 : 1
-                  }}
+                  animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.15 }}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, index)}
-                  onDragOver={(e) => handleDragOver(e as unknown as React.DragEvent, index)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e as unknown as React.DragEvent, index)}
-                  onDragEnd={handleDragEnd}
+                  whileDrag={{
+                    scale: 1.02,
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+                    cursor: "grabbing",
+                  }}
                   className={cn(
-                    "group relative flex items-center gap-2 h-8 rounded-lg cursor-pointer transition-all",
+                    "group relative flex items-center gap-2 h-8 rounded-lg cursor-grab transition-colors",
                     "min-w-[120px] max-w-[180px]",
                     isActive
                       ? "bg-background shadow-sm"
-                      : "hover:bg-secondary/50",
-                    isDropTarget && "ring-2 ring-primary/50 ring-offset-1 ring-offset-card"
+                      : "hover:bg-secondary/50"
                   )}
                   style={{
                     paddingLeft: tabColor !== "transparent" ? 16 : 12,
@@ -223,11 +187,11 @@ export function TabBar() {
                   >
                     <X className="w-3 h-3" />
                   </button>
-                </motion.div>
+                </Reorder.Item>
               );
             })}
           </AnimatePresence>
-        </div>
+        </Reorder.Group>
 
         {/* Actions */}
         <div className="flex items-center gap-1 pl-2 border-l border-border/50 ml-2">

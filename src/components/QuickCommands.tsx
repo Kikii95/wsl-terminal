@@ -90,7 +90,10 @@ export function QuickCommands({ isOpen, onClose }: QuickCommandsProps) {
   }, [isOpen, flatList, selectedIndex, showAddForm, onClose]);
 
   const executeSnippet = async (snippet: Snippet) => {
-    if (!activeTabId) return;
+    if (!activeTabId) {
+      console.warn("No active tab to execute command");
+      return;
+    }
 
     try {
       await invoke("write_to_shell", {
@@ -273,7 +276,10 @@ export function QuickCommands({ isOpen, onClose }: QuickCommandsProps) {
                     return (
                       <motion.button
                         key={snippet.id}
-                        onClick={() => executeSnippet(snippet)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          executeSnippet(snippet);
+                        }}
                         onMouseEnter={() => setSelectedIndex(index)}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors group"
                         style={{

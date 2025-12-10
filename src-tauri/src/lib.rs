@@ -363,12 +363,18 @@ async fn get_docker_status() -> Result<DockerStatus, String> {
 }
 
 #[tauri::command]
-async fn list_projects() -> Result<Vec<ProjectInfo>, String> {
+async fn list_projects(root_path: String, categories: Vec<String>) -> Result<Vec<ProjectInfo>, String> {
+    // Expand ~ to home directory
     let home = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
-    let projects_base = format!("{}/projects", home);
+    let projects_base = if root_path.starts_with("~/") {
+        root_path.replacen("~", &home, 1)
+    } else if root_path == "~" {
+        home.clone()
+    } else {
+        root_path
+    };
 
     let mut projects = Vec::new();
-    let categories = ["ecole", "perso", "travail"];
 
     for category in &categories {
         let category_path = format!("{}/{}", projects_base, category);

@@ -4,6 +4,7 @@ import { Search, Folder, FolderGit2, ChevronRight, GraduationCap, Home, Briefcas
 import { invoke } from "@tauri-apps/api/core";
 import { useTheme } from "@/App";
 import { useTerminalStore } from "@/stores/terminalStore";
+import { useConfigStore } from "@/stores/configStore";
 
 interface ProjectInfo {
   name: string;
@@ -32,6 +33,7 @@ const categoryColors: Record<string, string> = {
 export function ProjectSwitcher({ isOpen, onClose }: ProjectSwitcherProps) {
   const theme = useTheme();
   const { activeTabId } = useTerminalStore();
+  const { projects: projectsConfig } = useConfigStore();
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -42,7 +44,10 @@ export function ProjectSwitcher({ isOpen, onClose }: ProjectSwitcherProps) {
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
-      invoke<ProjectInfo[]>("list_projects")
+      invoke<ProjectInfo[]>("list_projects", {
+        rootPath: projectsConfig.rootPath,
+        categories: projectsConfig.categories,
+      })
         .then((data) => {
           setProjects(data);
           setLoading(false);
@@ -55,7 +60,7 @@ export function ProjectSwitcher({ isOpen, onClose }: ProjectSwitcherProps) {
       setSearch("");
       setSelectedIndex(0);
     }
-  }, [isOpen]);
+  }, [isOpen, projectsConfig]);
 
   // Filter projects
   const filteredProjects = useMemo(() => {
@@ -210,7 +215,10 @@ export function ProjectSwitcher({ isOpen, onClose }: ProjectSwitcherProps) {
                       return (
                         <motion.button
                           key={project.path}
-                          onClick={() => openProject(project)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openProject(project);
+                          }}
                           onMouseEnter={() => setSelectedIndex(index)}
                           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors"
                           style={{

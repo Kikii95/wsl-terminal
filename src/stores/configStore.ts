@@ -14,6 +14,8 @@ interface ConfigState extends Config {
   setQuakeHotkey: (hotkey: string) => void;
   setNotificationsEnabled: (enabled: boolean) => void;
   setNotificationMinDuration: (seconds: number) => void;
+  setProjectsRootPath: (path: string) => void;
+  setProjectsCategories: (categories: string[]) => void;
 }
 
 const defaultConfig: Config = {
@@ -51,6 +53,10 @@ const defaultConfig: Config = {
     minDuration: 5, // Notify for commands that take > 5 seconds
     onlyWhenUnfocused: true,
   },
+  projects: {
+    rootPath: "~/projects",
+    categories: ["ecole", "perso", "travail"],
+  },
 };
 
 export const useConfigStore = create<ConfigState>()(
@@ -63,6 +69,7 @@ export const useConfigStore = create<ConfigState>()(
       keybindings: defaultConfig.keybindings,
       window: defaultConfig.window,
       notifications: defaultConfig.notifications,
+      projects: defaultConfig.projects,
 
       setTheme: (theme) =>
         set((state) => ({
@@ -118,10 +125,20 @@ export const useConfigStore = create<ConfigState>()(
         set((state) => ({
           notifications: { ...state.notifications, minDuration },
         })),
+
+      setProjectsRootPath: (rootPath) =>
+        set((state) => ({
+          projects: { ...state.projects, rootPath },
+        })),
+
+      setProjectsCategories: (categories) =>
+        set((state) => ({
+          projects: { ...state.projects, categories },
+        })),
     }),
     {
       name: "wsl-terminal-config",
-      version: 2, // Bump this when adding new fields
+      version: 3, // Bump for projects config
       merge: (persistedState, currentState) => {
         // Deep merge persisted state with defaults to handle missing fields
         const persisted = persistedState as Partial<Config>;
@@ -132,6 +149,7 @@ export const useConfigStore = create<ConfigState>()(
           keybindings: { ...defaultConfig.keybindings, ...persisted?.keybindings },
           window: { ...defaultConfig.window, ...persisted?.window },
           notifications: { ...defaultConfig.notifications, ...persisted?.notifications },
+          projects: { ...defaultConfig.projects, ...persisted?.projects },
         };
       },
     }

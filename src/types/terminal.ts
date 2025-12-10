@@ -77,6 +77,10 @@ export interface Config {
     minDuration: number; // Minimum command duration in seconds to trigger notification
     onlyWhenUnfocused: boolean;
   };
+  projects: {
+    rootPath: string; // Base path for project switcher (e.g., ~/projects)
+    categories: string[]; // Subdirectories to scan (e.g., ["ecole", "perso", "travail"])
+  };
 }
 
 export interface ShellProfile {
