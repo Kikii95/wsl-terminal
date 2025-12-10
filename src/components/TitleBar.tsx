@@ -35,8 +35,8 @@ export function TitleBar() {
         borderBottom: `1px solid ${theme.ui.border}`,
       }}
     >
-      {/* Left: Logo + Title - Added more left padding */}
-      <div className="flex items-center gap-3 pl-6 pr-4" data-tauri-drag-region>
+      {/* Left: Logo + Title */}
+      <div className="flex items-center gap-3 pr-4" style={{ paddingLeft: "20px" }} data-tauri-drag-region>
         <div
           className="flex items-center justify-center w-6 h-6 rounded"
           style={{

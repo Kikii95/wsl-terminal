@@ -23,8 +23,10 @@ export function StatusBar() {
 
   return (
     <div
-      className="flex items-center justify-between h-6 px-6 text-[10px]"
+      className="flex items-center justify-between h-6 text-[10px]"
       style={{
+        paddingLeft: "20px",
+        paddingRight: "20px",
         backgroundColor: theme.ui.surface,
         borderTop: `1px solid ${theme.ui.border}`,
         color: theme.ui.textMuted,
