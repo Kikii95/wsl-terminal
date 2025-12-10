@@ -70,6 +70,7 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
       cursorStyle: appearance.cursorStyle,
       cursorBlink: appearance.cursorBlink,
       allowTransparency: true,
+      allowProposedApi: true, // Required for ligatures addon
       scrollback: 10000,
       convertEol: true,
     });
