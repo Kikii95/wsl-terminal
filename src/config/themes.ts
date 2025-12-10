@@ -1,7 +1,23 @@
 import type { TerminalTheme } from "@/types/terminal";
 
-export const themes: Record<string, TerminalTheme> = {
-  // Dark themes
+// Extended theme with UI colors
+export interface AppTheme extends TerminalTheme {
+  ui: {
+    background: string;
+    surface: string;
+    surfaceHover: string;
+    border: string;
+    borderSubtle: string;
+    text: string;
+    textMuted: string;
+    textSubtle: string;
+    accent: string;
+    accentHover: string;
+  };
+}
+
+export const themes: Record<string, AppTheme> = {
+  // === DARK THEMES ===
   "catppuccin-mocha": {
     name: "Catppuccin Mocha",
     background: "#1e1e2e",
@@ -25,6 +41,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#f5c2e7",
     brightCyan: "#94e2d5",
     brightWhite: "#a6adc8",
+    ui: {
+      background: "#11111b",
+      surface: "#1e1e2e",
+      surfaceHover: "#313244",
+      border: "#313244",
+      borderSubtle: "#45475a",
+      text: "#cdd6f4",
+      textMuted: "#a6adc8",
+      textSubtle: "#6c7086",
+      accent: "#89b4fa",
+      accentHover: "#b4befe",
+    },
   },
   "dracula": {
     name: "Dracula",
@@ -49,6 +77,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#ff92df",
     brightCyan: "#a4ffff",
     brightWhite: "#ffffff",
+    ui: {
+      background: "#1e1f29",
+      surface: "#282a36",
+      surfaceHover: "#44475a",
+      border: "#44475a",
+      borderSubtle: "#6272a4",
+      text: "#f8f8f2",
+      textMuted: "#bfbfbf",
+      textSubtle: "#6272a4",
+      accent: "#bd93f9",
+      accentHover: "#ff79c6",
+    },
   },
   "nord": {
     name: "Nord",
@@ -73,6 +113,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#b48ead",
     brightCyan: "#8fbcbb",
     brightWhite: "#eceff4",
+    ui: {
+      background: "#242933",
+      surface: "#2e3440",
+      surfaceHover: "#3b4252",
+      border: "#3b4252",
+      borderSubtle: "#4c566a",
+      text: "#eceff4",
+      textMuted: "#d8dee9",
+      textSubtle: "#4c566a",
+      accent: "#88c0d0",
+      accentHover: "#8fbcbb",
+    },
   },
   "one-dark": {
     name: "One Dark",
@@ -97,30 +149,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#c678dd",
     brightCyan: "#56b6c2",
     brightWhite: "#ffffff",
-  },
-  "gruvbox-dark": {
-    name: "Gruvbox Dark",
-    background: "#282828",
-    foreground: "#ebdbb2",
-    cursor: "#ebdbb2",
-    cursorAccent: "#282828",
-    selectionBackground: "#504945",
-    black: "#282828",
-    red: "#cc241d",
-    green: "#98971a",
-    yellow: "#d79921",
-    blue: "#458588",
-    magenta: "#b16286",
-    cyan: "#689d6a",
-    white: "#a89984",
-    brightBlack: "#928374",
-    brightRed: "#fb4934",
-    brightGreen: "#b8bb26",
-    brightYellow: "#fabd2f",
-    brightBlue: "#83a598",
-    brightMagenta: "#d3869b",
-    brightCyan: "#8ec07c",
-    brightWhite: "#ebdbb2",
+    ui: {
+      background: "#21252b",
+      surface: "#282c34",
+      surfaceHover: "#3e4451",
+      border: "#3e4451",
+      borderSubtle: "#5c6370",
+      text: "#abb2bf",
+      textMuted: "#828997",
+      textSubtle: "#5c6370",
+      accent: "#61afef",
+      accentHover: "#528bff",
+    },
   },
   "tokyo-night": {
     name: "Tokyo Night",
@@ -145,9 +185,21 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#bb9af7",
     brightCyan: "#7dcfff",
     brightWhite: "#c0caf5",
+    ui: {
+      background: "#16161e",
+      surface: "#1a1b26",
+      surfaceHover: "#24283b",
+      border: "#24283b",
+      borderSubtle: "#414868",
+      text: "#c0caf5",
+      textMuted: "#a9b1d6",
+      textSubtle: "#565f89",
+      accent: "#7aa2f7",
+      accentHover: "#bb9af7",
+    },
   },
 
-  // Vibrant themes
+  // === VIBRANT THEMES ===
   "cyberpunk": {
     name: "Cyberpunk",
     background: "#0d0d0d",
@@ -171,6 +223,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#ff7eff",
     brightCyan: "#7effff",
     brightWhite: "#ffffff",
+    ui: {
+      background: "#050505",
+      surface: "#0d0d0d",
+      surfaceHover: "#1a1a1a",
+      border: "#ff00ff",
+      borderSubtle: "#3d3d3d",
+      text: "#00ff9f",
+      textMuted: "#00cc7f",
+      textSubtle: "#666666",
+      accent: "#ff00ff",
+      accentHover: "#ff7eff",
+    },
   },
   "synthwave": {
     name: "Synthwave '84",
@@ -195,6 +259,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#ff7edb",
     brightCyan: "#03edf9",
     brightWhite: "#ffffff",
+    ui: {
+      background: "#0f0f1a",
+      surface: "#1a1a2e",
+      surfaceHover: "#2a2a4a",
+      border: "#ff7edb",
+      borderSubtle: "#495495",
+      text: "#ff7edb",
+      textMuted: "#03edf9",
+      textSubtle: "#495495",
+      accent: "#72f1b8",
+      accentHover: "#fede5d",
+    },
   },
   "neon": {
     name: "Neon Lights",
@@ -219,6 +295,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#ff66ff",
     brightCyan: "#66ffff",
     brightWhite: "#ffffff",
+    ui: {
+      background: "#000000",
+      surface: "#0a0a0a",
+      surfaceHover: "#1a1a1a",
+      border: "#39ff14",
+      borderSubtle: "#333333",
+      text: "#ffffff",
+      textMuted: "#cccccc",
+      textSubtle: "#666666",
+      accent: "#39ff14",
+      accentHover: "#7fff00",
+    },
   },
   "matrix": {
     name: "Matrix",
@@ -243,6 +331,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#00ff41",
     brightCyan: "#00ff41",
     brightWhite: "#ffffff",
+    ui: {
+      background: "#000000",
+      surface: "#0d0208",
+      surfaceHover: "#0a1f0a",
+      border: "#00ff41",
+      borderSubtle: "#003b00",
+      text: "#00ff41",
+      textMuted: "#00cc33",
+      textSubtle: "#006622",
+      accent: "#00ff41",
+      accentHover: "#66ff88",
+    },
   },
   "aurora": {
     name: "Aurora",
@@ -267,6 +367,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#c792ea",
     brightCyan: "#7fdbca",
     brightWhite: "#ffffff",
+    ui: {
+      background: "#00111f",
+      surface: "#011627",
+      surfaceHover: "#0b2942",
+      border: "#1d3b53",
+      borderSubtle: "#575656",
+      text: "#d6deeb",
+      textMuted: "#b0bec5",
+      textSubtle: "#637777",
+      accent: "#82aaff",
+      accentHover: "#c792ea",
+    },
   },
   "sunset": {
     name: "Sunset Vibes",
@@ -291,6 +403,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#ff6b6b",
     brightCyan: "#ffd89b",
     brightWhite: "#ffffff",
+    ui: {
+      background: "#150d28",
+      surface: "#1f1135",
+      surfaceHover: "#2d1a50",
+      border: "#ff6e7f",
+      borderSubtle: "#553c9a",
+      text: "#ffecd2",
+      textMuted: "#e0c8a8",
+      textSubtle: "#8b6b9e",
+      accent: "#ff6e7f",
+      accentHover: "#fcb045",
+    },
   },
   "ocean": {
     name: "Deep Ocean",
@@ -315,9 +439,21 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#c792ea",
     brightCyan: "#89ddff",
     brightWhite: "#ffffff",
+    ui: {
+      background: "#061122",
+      surface: "#0a192f",
+      surfaceHover: "#112240",
+      border: "#1d3a5c",
+      borderSubtle: "#495670",
+      text: "#ccd6f6",
+      textMuted: "#8892b0",
+      textSubtle: "#495670",
+      accent: "#64ffda",
+      accentHover: "#89ddff",
+    },
   },
 
-  // Light themes
+  // === LIGHT THEMES ===
   "github-light": {
     name: "GitHub Light",
     background: "#ffffff",
@@ -341,6 +477,18 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#8a63d2",
     brightCyan: "#3192aa",
     brightWhite: "#fafbfc",
+    ui: {
+      background: "#f6f8fa",
+      surface: "#ffffff",
+      surfaceHover: "#f3f4f6",
+      border: "#e1e4e8",
+      borderSubtle: "#d1d5da",
+      text: "#24292e",
+      textMuted: "#586069",
+      textSubtle: "#6a737d",
+      accent: "#0366d6",
+      accentHover: "#0256c7",
+    },
   },
   "solarized-light": {
     name: "Solarized Light",
@@ -365,15 +513,27 @@ export const themes: Record<string, TerminalTheme> = {
     brightMagenta: "#6c71c4",
     brightCyan: "#93a1a1",
     brightWhite: "#fdf6e3",
+    ui: {
+      background: "#eee8d5",
+      surface: "#fdf6e3",
+      surfaceHover: "#e8e1ce",
+      border: "#93a1a1",
+      borderSubtle: "#b8c4c4",
+      text: "#073642",
+      textMuted: "#586e75",
+      textSubtle: "#93a1a1",
+      accent: "#268bd2",
+      accentHover: "#2aa198",
+    },
   },
 };
 
-export const getTheme = (name: string): TerminalTheme => {
+export const getTheme = (name: string): AppTheme => {
   return themes[name] || themes["catppuccin-mocha"];
 };
 
 export const themeCategories = {
-  dark: ["catppuccin-mocha", "dracula", "nord", "one-dark", "gruvbox-dark", "tokyo-night"],
+  dark: ["catppuccin-mocha", "dracula", "nord", "one-dark", "tokyo-night"],
   vibrant: ["cyberpunk", "synthwave", "neon", "matrix", "aurora", "sunset", "ocean"],
   light: ["github-light", "solarized-light"],
 };

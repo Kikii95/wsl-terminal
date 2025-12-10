@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useTheme } from "@/App";
 
 export function TitleBar() {
   const appWindow = getCurrentWindow();
   const [isMaximized, setIsMaximized] = useState(false);
+  const theme = useTheme();
 
   useEffect(() => {
     const checkMaximized = async () => {
@@ -27,14 +29,20 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="
-        flex items-center justify-between h-10
-        bg-[#181825] select-none border-b border-[#313244]
-      "
+      className="flex items-center justify-between h-10 select-none"
+      style={{
+        backgroundColor: theme.ui.surface,
+        borderBottom: `1px solid ${theme.ui.border}`,
+      }}
     >
       {/* Left: Logo + Title */}
       <div className="flex items-center gap-3 px-4" data-tauri-drag-region>
-        <div className="flex items-center justify-center w-6 h-6 rounded bg-gradient-to-br from-[#89b4fa] to-[#cba6f7]">
+        <div
+          className="flex items-center justify-center w-6 h-6 rounded"
+          style={{
+            background: `linear-gradient(135deg, ${theme.ui.accent}, ${theme.magenta})`,
+          }}
+        >
           <svg
             width="14"
             height="14"
@@ -49,18 +57,27 @@ export function TitleBar() {
             <line x1="12" y1="19" x2="20" y2="19" />
           </svg>
         </div>
-        <span className="text-sm font-medium text-[#cdd6f4]">WSL Terminal</span>
-        <span className="text-xs text-[#6c7086] font-mono">v0.1.0</span>
+        <span className="text-sm font-medium" style={{ color: theme.ui.text }}>
+          WSL Terminal
+        </span>
+        <span className="text-xs font-mono" style={{ color: theme.ui.textMuted }}>
+          v0.1.1
+        </span>
       </div>
 
       {/* Right: Window Controls */}
       <div className="flex h-full">
         <button
-          className="
-            w-12 h-full flex items-center justify-center
-            hover:bg-[#313244] transition-all duration-150
-            text-[#a6adc8] hover:text-[#cdd6f4]
-          "
+          className="w-12 h-full flex items-center justify-center transition-all duration-150"
+          style={{ color: theme.ui.textMuted }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = theme.ui.surfaceHover;
+            e.currentTarget.style.color = theme.ui.text;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.color = theme.ui.textMuted;
+          }}
           onClick={handleMinimize}
           title="Minimize"
         >
@@ -77,11 +94,16 @@ export function TitleBar() {
         </button>
 
         <button
-          className="
-            w-12 h-full flex items-center justify-center
-            hover:bg-[#313244] transition-all duration-150
-            text-[#a6adc8] hover:text-[#cdd6f4]
-          "
+          className="w-12 h-full flex items-center justify-center transition-all duration-150"
+          style={{ color: theme.ui.textMuted }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = theme.ui.surfaceHover;
+            e.currentTarget.style.color = theme.ui.text;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.color = theme.ui.textMuted;
+          }}
           onClick={handleMaximize}
           title={isMaximized ? "Restore" : "Maximize"}
         >
@@ -102,7 +124,7 @@ export function TitleBar() {
                 y="2.5"
                 width="9"
                 height="9"
-                fill="#181825"
+                fill={theme.ui.surface}
                 stroke="currentColor"
                 strokeWidth="1"
                 rx="1"
@@ -125,11 +147,16 @@ export function TitleBar() {
         </button>
 
         <button
-          className="
-            w-12 h-full flex items-center justify-center
-            hover:bg-[#f38ba8] transition-all duration-150
-            text-[#a6adc8] hover:text-white
-          "
+          className="w-12 h-full flex items-center justify-center transition-all duration-150"
+          style={{ color: theme.ui.textMuted }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = theme.red;
+            e.currentTarget.style.color = "white";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.color = theme.ui.textMuted;
+          }}
           onClick={handleClose}
           title="Close"
         >
