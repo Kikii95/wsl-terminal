@@ -5,6 +5,22 @@ use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::Mutex;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+// Windows flag to hide console window
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+/// Create a Command that won't show a console window on Windows
+#[allow(unused_mut)]
+fn silent_command(program: &str) -> std::process::Command {
+    let mut cmd = std::process::Command::new(program);
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
 struct PtyProcess {
     writer: Box<dyn Write + Send>,
     _pair: portable_pty::PtyPair,
@@ -16,7 +32,7 @@ struct AppState {
 
 #[tauri::command]
 async fn get_wsl_distros() -> Result<Vec<String>, String> {
-    let output = std::process::Command::new("wsl.exe")
+    let output = silent_command("wsl.exe")
         .args(["--list", "--quiet"])
         .output()
         .map_err(|e| e.to_string())?;
@@ -227,7 +243,7 @@ async fn get_git_info(path: Option<String>) -> Result<GitInfo, String> {
     });
 
     // Get current branch
-    let branch_output = std::process::Command::new("git")
+    let branch_output = silent_command("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(&cwd)
         .output();
@@ -249,7 +265,7 @@ async fn get_git_info(path: Option<String>) -> Result<GitInfo, String> {
     }
 
     // Check if dirty (uncommitted changes)
-    let status_output = std::process::Command::new("git")
+    let status_output = silent_command("git")
         .args(["status", "--porcelain"])
         .current_dir(&cwd)
         .output();
@@ -260,7 +276,7 @@ async fn get_git_info(path: Option<String>) -> Result<GitInfo, String> {
     };
 
     // Get ahead/behind count
-    let ahead_behind = std::process::Command::new("git")
+    let ahead_behind = silent_command("git")
         .args(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
         .current_dir(&cwd)
         .output();
