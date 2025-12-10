@@ -39,7 +39,7 @@ interface CommandPaletteProps {
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(["Tabs", "Panes", "Window"]));
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const theme = useTheme();

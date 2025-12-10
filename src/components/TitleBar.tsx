@@ -1,10 +1,15 @@
 import { useState, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { motion } from "framer-motion";
-import { Minus, Square, X, Maximize2, Search, Command, PanelLeft } from "lucide-react";
+import { Minus, Square, X, Maximize2, Command, Network } from "lucide-react";
 import { useTheme } from "@/App";
 
-export function TitleBar() {
+interface TitleBarProps {
+  onOpenCommandPalette?: () => void;
+  onToggleSSHSidebar?: () => void;
+}
+
+export function TitleBar({ onOpenCommandPalette, onToggleSSHSidebar }: TitleBarProps) {
   const appWindow = getCurrentWindow();
   const [isMaximized, setIsMaximized] = useState(false);
   const theme = useTheme();
@@ -64,37 +69,29 @@ export function TitleBar() {
             WSL Terminal
           </span>
           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary/70">
-            v0.2.6
+            v0.3.4
           </span>
         </motion.div>
       </div>
 
-      {/* Center: Future actions (search, command palette, sidebar) */}
+      {/* Center: Actions */}
       <div
         className="flex-1 flex items-center justify-center gap-1"
         data-tauri-drag-region
       >
-        {/* Placeholders for future features - disabled for now */}
         <button
-          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground/30 cursor-not-allowed"
-          title="Search (Coming soon)"
-          disabled
-        >
-          <Search className="w-3.5 h-3.5" />
-        </button>
-        <button
-          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground/30 cursor-not-allowed"
-          title="Command Palette (Coming soon)"
-          disabled
+          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+          title="Command Palette (Ctrl+Shift+P)"
+          onClick={onOpenCommandPalette}
         >
           <Command className="w-3.5 h-3.5" />
         </button>
         <button
-          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground/30 cursor-not-allowed"
-          title="Toggle Sidebar (Coming soon)"
-          disabled
+          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+          title="SSH Connections"
+          onClick={onToggleSSHSidebar}
         >
-          <PanelLeft className="w-3.5 h-3.5" />
+          <Network className="w-3.5 h-3.5" />
         </button>
       </div>
 

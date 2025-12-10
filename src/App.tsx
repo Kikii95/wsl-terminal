@@ -176,11 +176,11 @@ function App() {
         style={{ backgroundColor: theme.ui.background }}
       >
         {/* Header: TitleBar + TabBar */}
-        <TitleBar />
-        <TabBar
+        <TitleBar
           onOpenCommandPalette={() => setShowCommandPalette(true)}
           onToggleSSHSidebar={() => setShowSSHSidebar(!showSSHSidebar)}
         />
+        <TabBar />
 
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden">

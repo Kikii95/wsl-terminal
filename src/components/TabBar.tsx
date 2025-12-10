@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Settings, Terminal, Cpu, Hash, ChevronDown, Network, Command } from "lucide-react";
+import { Plus, X, Settings, Terminal, Cpu, Hash, ChevronDown } from "lucide-react";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { SettingsModal } from "./SettingsModal";
 import { cn } from "@/lib/utils";
@@ -23,12 +23,7 @@ const shellConfig: Record<string, { icon: typeof Terminal; label: string; color:
   cmd: { icon: Hash, label: "CMD", color: "#6b7280" },
 };
 
-interface TabBarProps {
-  onOpenCommandPalette?: () => void;
-  onToggleSSHSidebar?: () => void;
-}
-
-export function TabBar({ onOpenCommandPalette, onToggleSSHSidebar }: TabBarProps) {
+export function TabBar() {
   const {
     tabs,
     activeTabId,
@@ -135,7 +130,7 @@ export function TabBar({ onOpenCommandPalette, onToggleSSHSidebar }: TabBarProps
                   <ShellIcon
                     className={cn(
                       "w-3.5 h-3.5 flex-shrink-0",
-                      tabColor !== "transparent" ? "ml-2" : ""
+                      tabColor !== "transparent" ? "ml-3" : ""
                     )}
                     style={{ color: isActive ? config.color : "currentColor" }}
                   />
@@ -261,24 +256,6 @@ export function TabBar({ onOpenCommandPalette, onToggleSSHSidebar }: TabBarProps
               )}
             </AnimatePresence>
           </div>
-
-          {/* Command Palette */}
-          <button
-            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-            onClick={onOpenCommandPalette}
-            title="Command Palette (Ctrl+Shift+P)"
-          >
-            <Command className="w-4 h-4" />
-          </button>
-
-          {/* SSH Manager */}
-          <button
-            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-            onClick={onToggleSSHSidebar}
-            title="SSH Connections"
-          >
-            <Network className="w-4 h-4" />
-          </button>
 
           {/* Settings */}
           <button
