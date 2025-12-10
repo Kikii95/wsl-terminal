@@ -83,14 +83,18 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
     xterm.loadAddon(webLinksAddon);
     xterm.loadAddon(searchAddon);
 
-    // Load ligatures addon if enabled
-    if (appearance.ligatures) {
-      const ligaturesAddon = new LigaturesAddon();
-      xterm.loadAddon(ligaturesAddon);
-      ligaturesAddonRef.current = ligaturesAddon;
-    }
-
     xterm.open(terminalRef.current);
+
+    // Load ligatures addon AFTER open (required by the addon)
+    if (appearance.ligatures) {
+      try {
+        const ligaturesAddon = new LigaturesAddon();
+        xterm.loadAddon(ligaturesAddon);
+        ligaturesAddonRef.current = ligaturesAddon;
+      } catch (e) {
+        console.warn("Failed to load ligatures addon:", e);
+      }
+    }
 
     // Initial fit
     setTimeout(() => {

@@ -69,7 +69,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
 }
 
 // Clear corrupted localStorage on version mismatch
-const APP_VERSION = "0.3.2";
+const APP_VERSION = "0.3.3";
 const storedVersion = localStorage.getItem("wsl-terminal-version");
 if (storedVersion !== APP_VERSION) {
   // New version - clear potentially incompatible data
