@@ -78,12 +78,17 @@ function App() {
 
   return (
     <ThemeContext.Provider value={theme}>
+      {/* Outer container with rounded corners and border */}
       <div
-        className="h-screen flex flex-col overflow-hidden"
-        style={{ backgroundColor: theme.ui.background }}
+        className="h-screen w-screen overflow-hidden rounded-xl"
+        style={{
+          backgroundColor: theme.ui.background,
+          border: `1px solid ${theme.ui.border}`,
+        }}
       >
-        <TitleBar />
-        <TabBar />
+        <div className="h-full flex flex-col overflow-hidden">
+          <TitleBar />
+          <TabBar />
 
         {/* Terminal Area with padding on all sides */}
         <div className="flex-1 overflow-hidden relative px-3 pb-2">
@@ -165,7 +170,8 @@ function App() {
           </div>
         </div>
 
-        <StatusBar />
+          <StatusBar />
+        </div>
       </div>
     </ThemeContext.Provider>
   );

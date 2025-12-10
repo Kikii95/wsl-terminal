@@ -35,8 +35,8 @@ export function TitleBar() {
         borderBottom: `1px solid ${theme.ui.border}`,
       }}
     >
-      {/* Left: Logo + Title */}
-      <div className="flex items-center gap-3 px-4" data-tauri-drag-region>
+      {/* Left: Logo + Title - Added more left padding */}
+      <div className="flex items-center gap-3 pl-5 pr-4" data-tauri-drag-region>
         <div
           className="flex items-center justify-center w-6 h-6 rounded"
           style={{
@@ -61,7 +61,7 @@ export function TitleBar() {
           WSL Terminal
         </span>
         <span className="text-xs font-mono" style={{ color: theme.ui.textMuted }}>
-          v0.1.1
+          v0.1.2
         </span>
       </div>
 
