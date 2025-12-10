@@ -216,6 +216,7 @@ async fn kill_shell(tab_id: String, state: tauri::State<'_, AppState>) -> Result
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(AppState {
             processes: Arc::new(Mutex::new(HashMap::new())),
         })

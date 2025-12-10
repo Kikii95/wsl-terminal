@@ -64,7 +64,7 @@ export function TitleBar() {
             WSL Terminal
           </span>
           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary/70">
-            v0.2.4
+            v0.2.5
           </span>
         </motion.div>
       </div>

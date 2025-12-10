@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useConfigStore } from "@/stores/configStore";
 import { getTheme } from "@/config/themes";
 import "@xterm/xterm/css/xterm.css";
@@ -77,6 +78,30 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
 
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
+
+    // Handle Ctrl+C: copy if selection exists, otherwise send SIGINT
+    xterm.attachCustomKeyEventHandler((event) => {
+      // Ctrl+C handling
+      if (event.ctrlKey && event.key === "c" && event.type === "keydown") {
+        const selection = xterm.getSelection();
+        if (selection && selection.length > 0) {
+          // Copy selection to clipboard
+          writeText(selection).catch(console.error);
+          xterm.clearSelection();
+          return false; // Prevent default (don't send ^C)
+        }
+        // No selection: let it through to send SIGINT
+        return true;
+      }
+
+      // Ctrl+V: paste from clipboard
+      if (event.ctrlKey && event.key === "v" && event.type === "keydown") {
+        // Let the browser handle paste, xterm will receive it
+        return true;
+      }
+
+      return true; // Allow all other keys
+    });
 
     // Handle user input
     xterm.onData((data) => {
