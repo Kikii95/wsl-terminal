@@ -233,7 +233,9 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
       searchAddonRef.current = null;
       ligaturesAddonRef.current = null;
     };
-  }, [tabId, shell, distro, writeToShell, resizePty, showSearch, appearance.ligatures, onCommandStart, onOutput, cleanupNotification]);
+    // NOTE: showSearch removed from deps - it was causing terminal re-init on search toggle
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabId, shell, distro, appearance.ligatures]);
 
   // Focus terminal when tab becomes active
   useEffect(() => {
@@ -279,7 +281,15 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
   }, []);
 
   return (
-    <div className={`h-full w-full relative ${isActive ? "" : "hidden"}`}>
+    <div
+      className="h-full w-full relative"
+      style={{
+        visibility: isActive ? "visible" : "hidden",
+        position: isActive ? "relative" : "absolute",
+        top: 0,
+        left: 0,
+      }}
+    >
       {/* Search Bar */}
       {showSearch && (
         <SearchBar

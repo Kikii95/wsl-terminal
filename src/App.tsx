@@ -177,7 +177,10 @@ function App() {
       >
         {/* Header: TitleBar + TabBar */}
         <TitleBar />
-        <TabBar />
+        <TabBar
+          onOpenCommandPalette={() => setShowCommandPalette(true)}
+          onToggleSSHSidebar={() => setShowSSHSidebar(!showSSHSidebar)}
+        />
 
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden">

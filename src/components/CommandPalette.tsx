@@ -11,6 +11,9 @@ import {
   Maximize,
   ToggleLeft,
   ToggleRight,
+  ChevronRight,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { useTheme } from "@/App";
 import { useTerminalStore } from "@/stores/terminalStore";
@@ -36,13 +39,27 @@ interface CommandPaletteProps {
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(["Tabs", "Panes", "Window"]));
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const theme = useTheme();
 
   const { tabs, activeTabId, addTab, removeTab } = useTerminalStore();
   const { panes, splitPane } = usePaneStore();
-  const { setTheme, window: windowConfig, setQuakeMode } = useConfigStore();
+  const { appearance, setTheme: setAppTheme, window: windowConfig, setQuakeMode } = useConfigStore();
+
+  // Toggle category expansion
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
 
   // Define all commands
   const commands: CommandItem[] = useMemo(() => [
@@ -50,7 +67,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     {
       id: "new-tab",
       label: "New Terminal Tab",
-      description: "Open a new terminal tab",
+      description: "Open a new WSL terminal",
       icon: <Plus className="w-4 h-4" />,
       shortcut: "Ctrl+Shift+T",
       action: () => { addTab("wsl"); onClose(); },
@@ -114,16 +131,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       category: "Panes",
     },
 
-    // Theme commands
-    ...Object.entries(themes).map(([id, t]) => ({
-      id: `theme-${id}`,
-      label: `Theme: ${t.name}`,
-      description: "Change the terminal theme",
-      icon: <Palette className="w-4 h-4" />,
-      action: () => { setTheme(id); onClose(); },
-      category: "Appearance",
-    })),
-
     // Window commands
     {
       id: "toggle-fullscreen",
@@ -149,12 +156,23 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       action: () => { setQuakeMode(!windowConfig.quakeMode); onClose(); },
       category: "Window",
     },
-  ], [activeTabId, addTab, removeTab, tabs, panes, splitPane, setTheme, onClose, windowConfig, setQuakeMode]);
+
+    // Theme commands - collapsed into "Themes" category
+    ...Object.entries(themes).map(([id, t]) => ({
+      id: `theme-${id}`,
+      label: t.name,
+      description: appearance.theme === id ? "Current theme" : undefined,
+      icon: appearance.theme === id ? <Check className="w-4 h-4" /> : <Palette className="w-4 h-4" />,
+      action: () => { setAppTheme(id); onClose(); },
+      category: "Themes",
+    })),
+  ], [activeTabId, addTab, removeTab, tabs, panes, splitPane, setAppTheme, onClose, windowConfig, setQuakeMode, appearance.theme]);
 
   // Filter commands based on query
   const filteredCommands = useMemo(() => {
     if (!query.trim()) return commands;
     const lowerQuery = query.toLowerCase();
+    // When searching, expand all categories
     return commands.filter(
       (cmd) =>
         cmd.label.toLowerCase().includes(lowerQuery) ||
@@ -166,14 +184,45 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   // Group commands by category
   const groupedCommands = useMemo(() => {
     const groups: Record<string, CommandItem[]> = {};
+    const categoryOrder = ["Tabs", "Panes", "Window", "Themes"];
+
     filteredCommands.forEach((cmd) => {
       if (!groups[cmd.category]) {
         groups[cmd.category] = [];
       }
       groups[cmd.category].push(cmd);
     });
-    return groups;
+
+    // Sort by category order
+    const sortedGroups: Record<string, CommandItem[]> = {};
+    categoryOrder.forEach(cat => {
+      if (groups[cat]) {
+        sortedGroups[cat] = groups[cat];
+      }
+    });
+    // Add any remaining categories
+    Object.keys(groups).forEach(cat => {
+      if (!sortedGroups[cat]) {
+        sortedGroups[cat] = groups[cat];
+      }
+    });
+
+    return sortedGroups;
   }, [filteredCommands]);
+
+  // Get flat list of visible commands for keyboard navigation
+  const visibleCommands = useMemo(() => {
+    const result: CommandItem[] = [];
+    const isSearching = query.trim().length > 0;
+
+    Object.entries(groupedCommands).forEach(([category, cmds]) => {
+      if (isSearching || expandedCategories.has(category)) {
+        result.push(...cmds);
+      }
+    });
+
+    return result;
+  }, [groupedCommands, expandedCategories, query]);
 
   // Reset selection when query changes
   useEffect(() => {
@@ -191,7 +240,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   // Scroll selected item into view
   useEffect(() => {
-    const selectedEl = listRef.current?.querySelector(`[data-index="${selectedIndex}"]`);
+    const selectedEl = listRef.current?.querySelector(`[data-selected="true"]`);
     selectedEl?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
@@ -203,7 +252,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setSelectedIndex((i) => Math.min(i + 1, filteredCommands.length - 1));
+          setSelectedIndex((i) => Math.min(i + 1, visibleCommands.length - 1));
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -211,7 +260,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           break;
         case "Enter":
           e.preventDefault();
-          filteredCommands[selectedIndex]?.action();
+          visibleCommands[selectedIndex]?.action();
           break;
         case "Escape":
           e.preventDefault();
@@ -222,11 +271,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, selectedIndex, filteredCommands, onClose]);
+  }, [isOpen, selectedIndex, visibleCommands, onClose]);
 
   if (!isOpen) return null;
 
-  let flatIndex = 0;
+  const isSearching = query.trim().length > 0;
+  let currentVisibleIndex = 0;
 
   return (
     <AnimatePresence>
@@ -295,67 +345,87 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 No commands found
               </div>
             ) : (
-              Object.entries(groupedCommands).map(([category, cmds]) => (
-                <div key={category}>
-                  {/* Category header */}
-                  <div
-                    className="px-4 py-1.5 text-[10px] uppercase tracking-wider font-medium sticky top-0"
-                    style={{
-                      color: theme.ui.textMuted,
-                      backgroundColor: theme.ui.surface,
-                    }}
-                  >
-                    {category}
-                  </div>
+              Object.entries(groupedCommands).map(([category, cmds]) => {
+                const isExpanded = isSearching || expandedCategories.has(category);
+                const categoryItemCount = cmds.length;
 
-                  {/* Commands in category */}
-                  {cmds.map((cmd) => {
-                    const currentIndex = flatIndex++;
-                    const isSelected = currentIndex === selectedIndex;
-
-                    return (
-                      <button
-                        key={cmd.id}
-                        data-index={currentIndex}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-left transition-colors"
-                        style={{
-                          backgroundColor: isSelected ? theme.ui.surfaceHover : "transparent",
-                          color: theme.ui.text,
-                        }}
-                        onClick={cmd.action}
-                        onMouseEnter={() => setSelectedIndex(currentIndex)}
-                      >
-                        <span style={{ color: isSelected ? theme.ui.accent : theme.ui.textMuted }}>
-                          {cmd.icon}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="truncate">{cmd.label}</div>
-                          {cmd.description && (
-                            <div
-                              className="text-xs truncate"
-                              style={{ color: theme.ui.textMuted }}
-                            >
-                              {cmd.description}
-                            </div>
-                          )}
-                        </div>
-                        {cmd.shortcut && (
-                          <kbd
-                            className="px-1.5 py-0.5 rounded text-[10px] font-mono"
-                            style={{
-                              backgroundColor: theme.ui.background,
-                              color: theme.ui.textMuted,
-                              border: `1px solid ${theme.ui.border}`,
-                            }}
-                          >
-                            {cmd.shortcut}
-                          </kbd>
+                return (
+                  <div key={category}>
+                    {/* Category header - clickable to expand/collapse */}
+                    <button
+                      className="w-full px-4 py-2 text-[11px] uppercase tracking-wider font-medium sticky top-0 flex items-center justify-between hover:bg-secondary/30 transition-colors"
+                      style={{
+                        color: theme.ui.textMuted,
+                        backgroundColor: theme.ui.surface,
+                      }}
+                      onClick={() => toggleCategory(category)}
+                    >
+                      <span className="flex items-center gap-2">
+                        {isExpanded ? (
+                          <ChevronDown className="w-3 h-3" />
+                        ) : (
+                          <ChevronRight className="w-3 h-3" />
                         )}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))
+                        {category}
+                      </span>
+                      <span className="text-[10px] opacity-60">
+                        {categoryItemCount}
+                      </span>
+                    </button>
+
+                    {/* Commands in category */}
+                    {isExpanded && cmds.map((cmd) => {
+                      const isSelected = currentVisibleIndex === selectedIndex;
+                      currentVisibleIndex++;
+
+                      return (
+                        <button
+                          key={cmd.id}
+                          data-selected={isSelected}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-left transition-colors"
+                          style={{
+                            backgroundColor: isSelected ? theme.ui.surfaceHover : "transparent",
+                            color: theme.ui.text,
+                          }}
+                          onClick={cmd.action}
+                          onMouseEnter={() => {
+                            // Find the actual index in visibleCommands
+                            const idx = visibleCommands.findIndex(c => c.id === cmd.id);
+                            if (idx !== -1) setSelectedIndex(idx);
+                          }}
+                        >
+                          <span style={{ color: isSelected ? theme.ui.accent : theme.ui.textMuted }}>
+                            {cmd.icon}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate">{cmd.label}</div>
+                            {cmd.description && (
+                              <div
+                                className="text-xs truncate"
+                                style={{ color: theme.ui.textMuted }}
+                              >
+                                {cmd.description}
+                              </div>
+                            )}
+                          </div>
+                          {cmd.shortcut && (
+                            <kbd
+                              className="px-1.5 py-0.5 rounded text-[10px] font-mono"
+                              style={{
+                                backgroundColor: theme.ui.background,
+                                color: theme.ui.textMuted,
+                                border: `1px solid ${theme.ui.border}`,
+                              }}
+                            >
+                              {cmd.shortcut}
+                            </kbd>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })
             )}
           </div>
 
