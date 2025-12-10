@@ -1,28 +1,20 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Circle, Palette, ChevronUp, Check, Clock } from "lucide-react";
+import { Circle, Palette, Check, Clock, Zap, Bell, GitBranch } from "lucide-react";
 import { useConfigStore } from "@/stores/configStore";
+import { useTerminalStore } from "@/stores/terminalStore";
 import { themes } from "@/config/themes";
 import { useTheme } from "@/App";
 import { cn } from "@/lib/utils";
 
-interface KbdProps {
-  children: React.ReactNode;
-}
-
-function Kbd({ children }: KbdProps) {
-  return (
-    <kbd className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-secondary text-foreground">
-      {children}
-    </kbd>
-  );
-}
-
 export function StatusBar() {
   const { appearance, setTheme } = useConfigStore();
+  const { tabs, activeTabId } = useTerminalStore();
   const [time, setTime] = useState(new Date());
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const theme = useTheme();
+
+  const activeTab = tabs.find((t) => t.id === activeTabId);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -36,96 +28,81 @@ export function StatusBar() {
     accent: t.ui.accent,
   }));
 
+  const currentTheme = themes[appearance.theme];
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4, duration: 0.3 }}
-      className="flex items-center justify-between h-7 px-5 text-[10px] bg-card border-t border-border text-muted-foreground"
-    >
-      {/* Left: Shell info */}
+    <div className="flex items-center justify-between h-6 px-3 text-[10px] bg-card/80 border-t border-border">
+      {/* Left: Connection Status + Shell Info */}
       <div className="flex items-center gap-3">
-        <motion.div
-          className="flex items-center gap-1.5"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
+        {/* Status indicator */}
+        <div className="flex items-center gap-1.5">
           <motion.div
             animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
           >
-            <Circle
-              className="w-2 h-2"
-              fill={theme.green}
-              stroke={theme.green}
-            />
+            <Circle className="w-1.5 h-1.5 fill-green-500 text-green-500" />
           </motion.div>
-          <span className="text-foreground/80">Connected</span>
-        </motion.div>
+          <span className="text-muted-foreground">Ready</span>
+        </div>
 
-        <span className="text-border">|</span>
+        <span className="text-border">•</span>
 
-        <span className="text-primary/80 font-medium">WSL2</span>
+        {/* Active shell */}
+        {activeTab && (
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-primary/60" />
+            <span className="text-foreground/70 font-medium">
+              {activeTab.shell === "wsl" ? activeTab.distro || "WSL" : activeTab.shell.toUpperCase()}
+            </span>
+          </div>
+        )}
 
-        <span className="text-border">|</span>
+        <span className="text-border">•</span>
 
-        <span className="font-mono text-muted-foreground">bash</span>
+        {/* Git branch placeholder - future feature */}
+        <div className="flex items-center gap-1.5 text-muted-foreground/50">
+          <GitBranch className="w-3 h-3" />
+          <span>main</span>
+        </div>
       </div>
 
-      {/* Center: Shortcuts hint */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="flex items-center gap-4 text-muted-foreground/60"
-      >
-        <span className="flex items-center gap-1">
-          <Kbd>Ctrl+Shift+T</Kbd>
-          <span>New tab</span>
+      {/* Center: Keyboard shortcuts hint */}
+      <div className="hidden md:flex items-center gap-4 text-muted-foreground/40">
+        <span>
+          <kbd className="px-1 py-0.5 rounded text-[8px] bg-secondary/50 text-muted-foreground">⌘T</kbd> new
         </span>
-        <span className="flex items-center gap-1">
-          <Kbd>Ctrl+W</Kbd>
-          <span>Close</span>
+        <span>
+          <kbd className="px-1 py-0.5 rounded text-[8px] bg-secondary/50 text-muted-foreground">⌘W</kbd> close
         </span>
-        <span className="flex items-center gap-1">
-          <Kbd>Ctrl+,</Kbd>
-          <span>Settings</span>
+        <span>
+          <kbd className="px-1 py-0.5 rounded text-[8px] bg-secondary/50 text-muted-foreground">⌘,</kbd> settings
         </span>
-      </motion.div>
+      </div>
 
-      {/* Right: Theme selector + Clock */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.7 }}
-        className="flex items-center gap-3"
-      >
-        {/* Theme Selector */}
-        <div className="relative z-50">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+      {/* Right: Theme + Notifications + Clock */}
+      <div className="flex items-center gap-2">
+        {/* Notifications placeholder - future feature */}
+        <button
+          className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground/30 cursor-not-allowed"
+          title="Notifications (Coming soon)"
+          disabled
+        >
+          <Bell className="w-3 h-3" />
+        </button>
+
+        {/* Theme Quick Switcher */}
+        <div className="relative">
+          <button
+            className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-secondary/50 transition-colors"
             onClick={() => setShowThemeMenu(!showThemeMenu)}
+            title="Change theme"
           >
-            <Palette className="w-3 h-3" />
             <div
-              className="w-3 h-3 rounded-sm ring-1 ring-border"
-              style={{
-                backgroundColor: themes[appearance.theme]?.background || theme.background,
-              }}
+              className="w-3 h-3 rounded-sm"
+              style={{ backgroundColor: currentTheme?.background || theme.background }}
             />
-            <span className="max-w-[80px] truncate">
-              {themes[appearance.theme]?.name || "Theme"}
-            </span>
-            <motion.div
-              animate={{ rotate: showThemeMenu ? 180 : 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <ChevronUp className="w-3 h-3" />
-            </motion.div>
-          </motion.button>
+            <Palette className="w-3 h-3 text-muted-foreground" />
+          </button>
 
           <AnimatePresence>
             {showThemeMenu && (
@@ -135,74 +112,53 @@ export function StatusBar() {
                   onClick={() => setShowThemeMenu(false)}
                 />
                 <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute bottom-full right-0 mb-2 z-[101] w-52 py-1 rounded-lg shadow-2xl max-h-72 overflow-y-auto bg-popover border border-border"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 5 }}
+                  className="absolute bottom-full right-0 mb-2 z-[101] w-56 py-1 rounded-lg shadow-xl bg-popover border border-border max-h-64 overflow-y-auto"
                 >
-                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/60 border-b border-border">
-                    Select Theme
+                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-medium sticky top-0 bg-popover">
+                    Theme
                   </div>
-                  {themeList.map((t, index) => {
-                    const isSelected = appearance.theme === t.id;
-                    return (
-                      <motion.button
-                        key={t.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.02 }}
-                        className={cn(
-                          "w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors",
-                          isSelected ? "text-foreground bg-secondary/50" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                        )}
-                        onClick={() => {
-                          setTheme(t.id);
-                          setShowThemeMenu(false);
-                        }}
-                      >
-                        <div
-                          className="w-5 h-5 rounded flex items-center justify-center ring-1 ring-border"
-                          style={{ backgroundColor: t.bg }}
-                        >
-                          {isSelected && (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              transition={{ type: "spring", duration: 0.3 }}
-                            >
-                              <Check className="w-3 h-3" style={{ color: t.accent }} />
-                            </motion.div>
+                  <div className="grid grid-cols-2 gap-1 p-2">
+                    {themeList.map((t) => {
+                      const isSelected = appearance.theme === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          className={cn(
+                            "flex items-center gap-2 px-2 py-1.5 rounded-md text-[10px] transition-colors text-left",
+                            isSelected
+                              ? "bg-primary/10 text-foreground"
+                              : "hover:bg-secondary text-muted-foreground hover:text-foreground"
                           )}
-                        </div>
-                        <span className="flex-1 text-left">{t.name}</span>
-                        {isSelected && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ backgroundColor: t.accent }}
-                          />
-                        )}
-                      </motion.button>
-                    );
-                  })}
+                          onClick={() => {
+                            setTheme(t.id);
+                            setShowThemeMenu(false);
+                          }}
+                        >
+                          <div
+                            className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: t.bg }}
+                          >
+                            {isSelected && <Check className="w-2.5 h-2.5" style={{ color: t.accent }} />}
+                          </div>
+                          <span className="truncate">{t.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </motion.div>
               </>
             )}
           </AnimatePresence>
         </div>
 
-        <span className="text-border">|</span>
+        <span className="text-border">•</span>
 
         {/* Clock */}
-        <motion.div
-          className="flex items-center gap-1.5 font-mono tabular-nums"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-        >
-          <Clock className="w-3 h-3 text-primary/60" />
+        <div className="flex items-center gap-1 text-muted-foreground font-mono">
+          <Clock className="w-3 h-3 text-primary/40" />
           <span>
             {time.toLocaleTimeString("en-US", {
               hour: "2-digit",
@@ -210,8 +166,8 @@ export function StatusBar() {
               hour12: false,
             })}
           </span>
-        </motion.div>
-      </motion.div>
-    </motion.div>
+        </div>
+      </div>
+    </div>
   );
 }
