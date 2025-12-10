@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings, Palette, Terminal as TerminalIcon, Keyboard, X, Check } from "lucide-react";
 import { useConfigStore } from "@/stores/configStore";
+import { useSessionStore } from "@/stores/sessionStore";
 import { themes } from "@/config/themes";
 import { useTheme } from "@/App";
 import { Switch } from "@/components/ui/switch";
@@ -45,6 +46,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setCursorStyle,
     setCursorBlink,
   } = useConfigStore();
+  const { enabled: sessionRestoreEnabled, setEnabled: setSessionRestoreEnabled } = useSessionStore();
 
   const [activeTab, setActiveTab] = useState<"appearance" | "terminal" | "keybindings">("appearance");
 
@@ -310,6 +312,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         <Switch
                           checked={appearance.cursorBlink}
                           onCheckedChange={setCursorBlink}
+                        />
+                      </div>
+
+                      {/* Session Restore */}
+                      <div className="flex items-center justify-between p-4 rounded-xl bg-secondary/50 border border-border">
+                        <div>
+                          <h4 className="text-sm font-medium text-foreground">Session Restore</h4>
+                          <p className="text-xs mt-0.5 text-muted-foreground">
+                            Restore tabs and working directory on startup
+                          </p>
+                        </div>
+                        <Switch
+                          checked={sessionRestoreEnabled}
+                          onCheckedChange={setSessionRestoreEnabled}
                         />
                       </div>
 

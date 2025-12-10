@@ -17,10 +17,12 @@ interface TerminalProps {
   tabId: string;
   shell: string;
   distro?: string;
+  initialCwd?: string;
   isActive: boolean;
+  onCwdChange?: (cwd: string) => void;
 }
 
-export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
+export function Terminal({ tabId, shell, distro, initialCwd, isActive, onCwdChange }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -167,6 +169,15 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
           xterm.write(event.payload);
           // Track output for notification system
           onOutput();
+
+          // Parse OSC 7 (Working directory) escape sequences
+          // Format: OSC 7 ; file://host/path ST
+          // or: OSC 7 ; /path ST
+          const oscMatch = event.payload.match(/\x1b\]7;(?:file:\/\/[^/]*)?([^\x07\x1b]+)[\x07\x1b]/);
+          if (oscMatch && onCwdChange) {
+            const path = decodeURIComponent(oscMatch[1]);
+            onCwdChange(path);
+          }
         }
       );
     };
@@ -178,7 +189,12 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
       shellSpawnedRef.current = true;
 
       try {
-        await invoke("spawn_shell", { tabId, shell, distro: distro || null });
+        await invoke("spawn_shell", {
+          tabId,
+          shell,
+          distro: distro || null,
+          initialCwd: initialCwd || null,
+        });
 
         // Resize after spawn
         setTimeout(() => {
@@ -238,9 +254,9 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
       searchAddonRef.current = null;
       ligaturesAddonRef.current = null;
     };
-    // NOTE: showSearch removed from deps - it was causing terminal re-init on search toggle
+    // NOTE: showSearch and onCwdChange removed from deps - it was causing terminal re-init on search toggle
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabId, shell, distro, appearance.ligatures]);
+  }, [tabId, shell, distro, initialCwd, appearance.ligatures]);
 
   // Focus terminal when tab becomes active
   useEffect(() => {

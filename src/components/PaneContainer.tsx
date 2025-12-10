@@ -1,7 +1,9 @@
+import { useCallback } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import type { PaneNode } from "@/types/terminal";
 import { Terminal } from "./Terminal";
 import { usePaneStore } from "@/stores/paneStore";
+import { useTerminalStore } from "@/stores/terminalStore";
 import { useTheme } from "@/App";
 
 interface PaneContainerProps {
@@ -12,9 +14,20 @@ interface PaneContainerProps {
 
 export function PaneContainer({ tabId, node, isTabActive }: PaneContainerProps) {
   const theme = useTheme();
-  const { panes, setActivePane } = usePaneStore();
+  const { panes, setActivePane, updatePaneCwd } = usePaneStore();
+  const { updateTabCwd } = useTerminalStore();
   const tabPane = panes[tabId];
   const activePaneId = tabPane?.activePaneId;
+
+  // Handle CWD changes from the terminal
+  const handleCwdChange = useCallback((cwd: string) => {
+    // Update pane cwd
+    updatePaneCwd(tabId, node.id, cwd);
+    // Also update tab cwd for session save (use root pane's cwd)
+    if (node.id === tabPane?.root.id || node.id === activePaneId) {
+      updateTabCwd(tabId, cwd);
+    }
+  }, [tabId, node.id, updatePaneCwd, updateTabCwd, tabPane?.root.id, activePaneId]);
 
   if (node.type === "terminal") {
     const isActive = isTabActive && activePaneId === node.id;
@@ -32,7 +45,9 @@ export function PaneContainer({ tabId, node, isTabActive }: PaneContainerProps) 
           tabId={node.id}
           shell={node.shell || "wsl"}
           distro={node.distro}
+          initialCwd={node.cwd}
           isActive={isActive}
+          onCwdChange={handleCwdChange}
         />
       </div>
     );

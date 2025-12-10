@@ -7,6 +7,7 @@ interface SavedTab {
   shell: string;
   distro?: string;
   color?: string;
+  cwd?: string;  // Last working directory
 }
 
 interface SavedPane {
@@ -49,6 +50,7 @@ export const useSessionStore = create<SessionState>()(
           shell: tab.shell,
           distro: tab.distro,
           color: tab.color,
+          cwd: tab.cwd,
         }));
 
         const savedPanes: SavedPane[] = tabs

@@ -85,6 +85,7 @@ async fn spawn_shell(
     tab_id: String,
     shell: String,
     distro: Option<String>,
+    initial_cwd: Option<String>,
     state: tauri::State<'_, AppState>,
     window: tauri::Window,
 ) -> Result<(), String> {
@@ -109,19 +110,31 @@ async fn spawn_shell(
             if let Some(d) = &distro {
                 c.args(["-d", d]);
             }
-            // Start WSL in home directory
-            c.args(["--cd", "~"]);
+            // Use initial_cwd if provided, otherwise home directory
+            if let Some(ref cwd) = initial_cwd {
+                c.args(["--cd", cwd]);
+            } else {
+                c.args(["--cd", "~"]);
+            }
             c
         }
         "powershell" => {
             let mut c = CommandBuilder::new("powershell.exe");
             c.args(["-NoLogo", "-NoExit"]);
-            c.cwd(&userprofile);
+            if let Some(ref cwd) = initial_cwd {
+                c.cwd(cwd);
+            } else {
+                c.cwd(&userprofile);
+            }
             c
         }
         "cmd" => {
             let mut c = CommandBuilder::new("cmd.exe");
-            c.cwd(&userprofile);
+            if let Some(ref cwd) = initial_cwd {
+                c.cwd(cwd);
+            } else {
+                c.cwd(&userprofile);
+            }
             c
         }
         _ => {
@@ -129,7 +142,11 @@ async fn spawn_shell(
             if let Some(d) = &distro {
                 c.args(["-d", d]);
             }
-            c.args(["--cd", "~"]);
+            if let Some(ref cwd) = initial_cwd {
+                c.args(["--cd", cwd]);
+            } else {
+                c.args(["--cd", "~"]);
+            }
             c
         }
     };

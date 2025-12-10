@@ -5,10 +5,11 @@ interface PaneState {
   panes: Record<string, TabPane>;
 
   // Actions
-  initTabPane: (tabId: string, shell: string, distro?: string) => string;
+  initTabPane: (tabId: string, shell: string, distro?: string, cwd?: string) => string;
   splitPane: (tabId: string, paneId: string, direction: SplitDirection, shell: string, distro?: string) => void;
   closePane: (tabId: string, paneId: string) => boolean; // returns true if tab should be closed
   setActivePane: (tabId: string, paneId: string) => void;
+  updatePaneCwd: (tabId: string, paneId: string, cwd: string) => void;
   removeTabPanes: (tabId: string) => void;
   getTabPane: (tabId: string) => TabPane | undefined;
 }
@@ -77,13 +78,14 @@ function getAllTerminalIds(node: PaneNode): string[] {
 export const usePaneStore = create<PaneState>((set, get) => ({
   panes: {},
 
-  initTabPane: (tabId: string, shell: string, distro?: string) => {
+  initTabPane: (tabId: string, shell: string, distro?: string, cwd?: string) => {
     const paneId = generateId();
     const root: PaneNode = {
       id: paneId,
       type: "terminal",
       shell,
       distro,
+      cwd,
     };
 
     set(state => ({
@@ -213,6 +215,36 @@ export const usePaneStore = create<PaneState>((set, get) => ({
         [tabId]: {
           ...tabPane,
           activePaneId: paneId,
+        },
+      },
+    }));
+  },
+
+  updatePaneCwd: (tabId: string, paneId: string, cwd: string) => {
+    const { panes } = get();
+    const tabPane = panes[tabId];
+    if (!tabPane) return;
+
+    // Helper to recursively update cwd in the pane tree
+    const updateCwdInNode = (node: PaneNode): PaneNode => {
+      if (node.id === paneId) {
+        return { ...node, cwd };
+      }
+      if (node.children) {
+        return {
+          ...node,
+          children: node.children.map(updateCwdInNode),
+        };
+      }
+      return node;
+    };
+
+    set(state => ({
+      panes: {
+        ...state.panes,
+        [tabId]: {
+          ...tabPane,
+          root: updateCwdInNode(tabPane.root),
         },
       },
     }));

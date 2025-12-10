@@ -82,7 +82,7 @@ function App() {
   useEffect(() => {
     tabs.forEach((tab) => {
       if (!panes[tab.id]) {
-        initTabPane(tab.id, tab.shell, tab.distro);
+        initTabPane(tab.id, tab.shell, tab.distro, tab.cwd);
       }
     });
     // Clean up panes for removed tabs

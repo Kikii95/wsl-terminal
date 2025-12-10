@@ -7,11 +7,12 @@ interface TerminalState {
   wslDistros: string[];
 
   // Actions
-  addTab: (shell?: string, distro?: string) => string;
+  addTab: (shell?: string, distro?: string, cwd?: string) => string;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTabTitle: (id: string, title: string) => void;
   updateTabColor: (id: string, color: string) => void;
+  updateTabCwd: (id: string, cwd: string) => void;
   setWslDistros: (distros: string[]) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   setTabs: (tabs: Tab[]) => void;
@@ -35,7 +36,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   activeTabId: null,
   wslDistros: [],
 
-  addTab: (shell = "wsl", distro?: string) => {
+  addTab: (shell = "wsl", distro?: string, cwd?: string) => {
     const { tabs } = get();
     let title = "Terminal";
 
@@ -52,6 +53,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       title,
       shell,
       distro,
+      cwd,
       color: TAB_COLORS[tabs.length % TAB_COLORS.length],
     };
 
@@ -99,6 +101,14 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((tab) =>
         tab.id === id ? { ...tab, color } : tab
+      ),
+    }));
+  },
+
+  updateTabCwd: (id: string, cwd: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === id ? { ...tab, cwd } : tab
       ),
     }));
   },

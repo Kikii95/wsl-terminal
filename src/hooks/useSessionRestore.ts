@@ -31,10 +31,10 @@ export function useSessionRestore() {
 
     hasRestored.current = true;
 
-    // Restore tabs
+    // Restore tabs with cwd
     const restoredTabIds: string[] = [];
     lastSession.tabs.forEach((savedTab) => {
-      const tabId = addTab(savedTab.shell, savedTab.distro);
+      const tabId = addTab(savedTab.shell, savedTab.distro, savedTab.cwd);
       restoredTabIds.push(tabId);
     });
 

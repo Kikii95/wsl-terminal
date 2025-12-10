@@ -16,6 +16,7 @@ export interface PaneNode {
   // For terminal type
   shell?: string;
   distro?: string;
+  cwd?: string;
   // For split type
   direction?: SplitDirection;
   children?: PaneNode[];
