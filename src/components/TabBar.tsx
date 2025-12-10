@@ -1,8 +1,11 @@
 import { useState, useEffect, ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, X, Settings, Terminal, MonitorDot, ChevronRight } from "lucide-react";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useTheme } from "@/App";
 import { SettingsModal } from "./SettingsModal";
+import { cn } from "@/lib/utils";
 
 const TAB_COLORS = [
   { id: "red", color: "#f38ba8" },
@@ -16,26 +19,186 @@ const TAB_COLORS = [
 ];
 
 const shellIcons: Record<string, ReactNode> = {
-  wsl: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M8 12h8M12 8v8" />
-    </svg>
-  ),
-  powershell: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <path d="M6 8l4 4-4 4" />
-      <line x1="12" y1="16" x2="18" y2="16" />
-    </svg>
-  ),
-  cmd: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <path d="M6 8l4 4-4 4" />
-    </svg>
-  ),
+  wsl: <Terminal className="w-3.5 h-3.5" />,
+  powershell: <MonitorDot className="w-3.5 h-3.5" />,
+  cmd: <ChevronRight className="w-3.5 h-3.5" />,
 };
+
+interface TabProps {
+  tab: {
+    id: string;
+    title: string;
+    shell: string;
+    color?: string;
+  };
+  index: number;
+  isActive: boolean;
+  isEditing: boolean;
+  editValue: string;
+  onSelect: () => void;
+  onDoubleClick: () => void;
+  onEditChange: (value: string) => void;
+  onEditSubmit: () => void;
+  onEditCancel: () => void;
+  onColorPickerToggle: () => void;
+  showColorPicker: boolean;
+  onColorSelect: (color: string) => void;
+  onClose: () => void;
+}
+
+function Tab({
+  tab,
+  index,
+  isActive,
+  isEditing,
+  editValue,
+  onSelect,
+  onDoubleClick,
+  onEditChange,
+  onEditSubmit,
+  onEditCancel,
+  onColorPickerToggle,
+  showColorPicker,
+  onColorSelect,
+  onClose,
+}: TabProps) {
+  const theme = useTheme();
+  const tabColor = tab.color || theme.ui.accent;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8, x: -20 }}
+      transition={{ type: "spring", duration: 0.3 }}
+      className={cn(
+        "group relative flex items-center gap-2 px-4 h-full min-w-[140px] max-w-[220px] transition-colors duration-150 border-r border-border/50",
+        isActive
+          ? "bg-background text-foreground"
+          : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 cursor-pointer"
+      )}
+      onClick={onSelect}
+      onDoubleClick={onDoubleClick}
+    >
+      {/* Active indicator */}
+      {isActive && (
+        <motion.div
+          layoutId="activeTabIndicator"
+          className="absolute top-0 left-0 right-0 h-[2px] rounded-b"
+          style={{ backgroundColor: tabColor }}
+          transition={{ type: "spring", duration: 0.3 }}
+        />
+      )}
+
+      {/* Tab number */}
+      <span className="text-[10px] font-mono w-4 text-center flex-shrink-0 text-muted-foreground/60">
+        {index + 1}
+      </span>
+
+      {/* Separator */}
+      <div className="w-px h-4 flex-shrink-0 bg-border/30" />
+
+      {/* Color dot */}
+      <div className="relative z-50">
+        <motion.button
+          whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.9 }}
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10 hover:ring-white/30 transition-all"
+          style={{ backgroundColor: tabColor }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onColorPickerToggle();
+          }}
+          title="Change color"
+        />
+
+        {/* Color picker dropdown */}
+        <AnimatePresence>
+          {showColorPicker && (
+            <>
+              <div
+                className="fixed inset-0 z-[100]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onColorPickerToggle();
+                }}
+              />
+              <motion.div
+                initial={{ opacity: 0, y: 5, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 5, scale: 0.9 }}
+                transition={{ duration: 0.15 }}
+                className="absolute left-0 bottom-full mb-2 z-[101] p-2 rounded-lg shadow-2xl bg-popover border border-border flex gap-1.5"
+              >
+                {TAB_COLORS.map((c) => (
+                  <motion.button
+                    key={c.id}
+                    whileHover={{ scale: 1.15 }}
+                    whileTap={{ scale: 0.9 }}
+                    className="w-5 h-5 rounded-full ring-1 ring-white/10 hover:ring-white/40 transition-all cursor-pointer"
+                    style={{ backgroundColor: c.color }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onColorSelect(c.color);
+                    }}
+                  />
+                ))}
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Shell icon */}
+      <span
+        className="flex-shrink-0 transition-colors"
+        style={{ color: isActive ? tabColor : "currentColor" }}
+      >
+        {shellIcons[tab.shell] || shellIcons.wsl}
+      </span>
+
+      {/* Tab title */}
+      {isEditing ? (
+        <input
+          type="text"
+          value={editValue}
+          onChange={(e) => onEditChange(e.target.value)}
+          onBlur={onEditSubmit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onEditSubmit();
+            if (e.key === "Escape") onEditCancel();
+          }}
+          className="flex-1 text-sm px-1 rounded outline-none min-w-0 bg-secondary text-foreground"
+          autoFocus
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span className="text-sm truncate flex-1 font-medium" title="Double-click to rename">
+          {tab.title}
+        </span>
+      )}
+
+      {/* Close button */}
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        className={cn(
+          "w-5 h-5 flex items-center justify-center rounded flex-shrink-0 transition-all duration-150",
+          "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+          isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        title="Close (Ctrl+W)"
+      >
+        <X className="w-3 h-3" />
+      </motion.button>
+    </motion.div>
+  );
+}
 
 export function TabBar() {
   const { tabs, activeTabId, wslDistros, addTab, removeTab, setActiveTab, updateTabTitle, updateTabColor, setWslDistros } = useTerminalStore();
@@ -46,7 +209,6 @@ export function TabBar() {
   const [showSettings, setShowSettings] = useState(false);
   const theme = useTheme();
 
-  // Fetch WSL distros on mount
   useEffect(() => {
     const fetchDistros = async () => {
       try {
@@ -72,316 +234,132 @@ export function TabBar() {
   };
 
   return (
-    <div
-      className="flex items-center h-10 relative z-50 mx-3 mt-1 rounded-t-lg"
-      style={{
-        backgroundColor: theme.ui.surface,
-        borderBottom: `1px solid ${theme.ui.border}`,
-      }}
-    >
+    <div className="flex items-center h-10 relative z-50 mx-3 mt-1 rounded-t-lg bg-card border-b border-border">
       {/* Tabs */}
       <div className="flex-1 flex items-center h-full overflow-x-auto scrollbar-none">
-        {tabs.map((tab, index) => {
-          const isActive = tab.id === activeTabId;
-          const tabColor = tab.color || theme.ui.accent;
-
-          return (
-            <div
+        <AnimatePresence mode="popLayout">
+          {tabs.map((tab, index) => (
+            <Tab
               key={tab.id}
-              className="group relative flex items-center gap-2 px-4 h-full cursor-pointer min-w-[140px] max-w-[220px] transition-all duration-150"
-              style={{
-                backgroundColor: isActive ? theme.ui.background : "transparent",
-                color: isActive ? theme.ui.text : theme.ui.textMuted,
-                borderRight: `1px solid ${theme.ui.borderSubtle}`,
-              }}
-              onClick={() => setActiveTab(tab.id)}
+              tab={tab}
+              index={index}
+              isActive={tab.id === activeTabId}
+              isEditing={editingTabId === tab.id}
+              editValue={editValue}
+              onSelect={() => setActiveTab(tab.id)}
               onDoubleClick={() => handleDoubleClick(tab.id, tab.title)}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = theme.ui.surfaceHover;
-                  e.currentTarget.style.color = theme.ui.text;
-                }
+              onEditChange={setEditValue}
+              onEditSubmit={() => handleRenameSubmit(tab.id)}
+              onEditCancel={() => setEditingTabId(null)}
+              onColorPickerToggle={() => setShowColorPicker(showColorPicker === tab.id ? null : tab.id)}
+              showColorPicker={showColorPicker === tab.id}
+              onColorSelect={(color) => {
+                updateTabColor(tab.id, color);
+                setShowColorPicker(null);
               }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = theme.ui.textMuted;
-                }
-              }}
-            >
-              {/* Active indicator */}
-              {isActive && (
-                <div
-                  className="absolute top-0 left-0 right-0 h-[2px] rounded-b"
-                  style={{ backgroundColor: tabColor }}
-                />
-              )}
-
-              {/* Tab number with better spacing */}
-              <span
-                className="text-[10px] font-mono w-5 text-center flex-shrink-0"
-                style={{ color: theme.ui.textSubtle }}
-              >
-                {index + 1}
-              </span>
-
-              {/* Subtle separator after number */}
-              <div
-                className="w-px h-4 flex-shrink-0"
-                style={{ backgroundColor: theme.ui.borderSubtle }}
-              />
-
-              {/* Color dot (click to change) */}
-              <div className="relative z-50">
-                <button
-                  className="w-3 h-3 rounded-full flex-shrink-0 hover:ring-2 hover:ring-white/20 transition-all hover:scale-125"
-                  style={{ backgroundColor: tabColor }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    setShowColorPicker(showColorPicker === tab.id ? null : tab.id);
-                  }}
-                  title="Change color"
-                />
-
-                {/* Color picker dropdown - positioned above with high z-index */}
-                {showColorPicker === tab.id && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-[100]"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowColorPicker(null);
-                      }}
-                    />
-                    <div
-                      className="absolute left-0 bottom-full mb-2 z-[101] p-2 rounded-lg shadow-2xl flex gap-1.5"
-                      style={{
-                        backgroundColor: theme.ui.surface,
-                        border: `1px solid ${theme.ui.border}`,
-                      }}
-                    >
-                      {TAB_COLORS.map((c) => (
-                        <button
-                          key={c.id}
-                          className="w-6 h-6 rounded-full hover:ring-2 hover:ring-white/40 transition-all hover:scale-110 cursor-pointer"
-                          style={{ backgroundColor: c.color }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            updateTabColor(tab.id, c.color);
-                            setShowColorPicker(null);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Shell icon */}
-              <span style={{ color: isActive ? tabColor : "currentColor" }} className="flex-shrink-0">
-                {shellIcons[tab.shell] || shellIcons.wsl}
-              </span>
-
-              {/* Tab title (editable) */}
-              {editingTabId === tab.id ? (
-                <input
-                  type="text"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={() => handleRenameSubmit(tab.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleRenameSubmit(tab.id);
-                    if (e.key === "Escape") setEditingTabId(null);
-                  }}
-                  className="flex-1 text-sm px-1 rounded outline-none min-w-0"
-                  style={{
-                    backgroundColor: theme.ui.surfaceHover,
-                    color: theme.ui.text,
-                  }}
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <span className="text-sm truncate flex-1 font-medium" title="Double-click to rename">
-                  {tab.title}
-                </span>
-              )}
-
-              {/* Close button */}
-              <button
-                className={`
-                  w-5 h-5 flex items-center justify-center rounded flex-shrink-0
-                  transition-all duration-150
-                  ${isActive
-                    ? "opacity-60 hover:opacity-100"
-                    : "opacity-0 group-hover:opacity-60 hover:!opacity-100"
-                  }
-                `}
-                style={{
-                  color: theme.ui.textMuted,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.ui.surfaceHover;
-                  e.currentTarget.style.color = TAB_COLORS[0].color; // red
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = theme.ui.textMuted;
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeTab(tab.id);
-                }}
-                title="Close (Ctrl+W)"
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10">
-                  <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-          );
-        })}
+              onClose={() => removeTab(tab.id)}
+            />
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* New Tab Button */}
       <div className="relative z-50">
-        <button
-          className="w-10 h-10 flex items-center justify-center transition-all duration-150"
-          style={{ color: theme.ui.textMuted }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = theme.ui.surfaceHover;
-            e.currentTarget.style.color = theme.ui.text;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "transparent";
-            e.currentTarget.style.color = theme.ui.textMuted;
-          }}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           onClick={() => setShowNewTabMenu(!showNewTabMenu)}
           title="New Tab (Ctrl+Shift+T)"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16">
-            <path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        </button>
+          <Plus className="w-4 h-4" />
+        </motion.button>
 
         {/* Dropdown Menu */}
-        {showNewTabMenu && (
-          <>
-            <div className="fixed inset-0 z-[100]" onClick={() => setShowNewTabMenu(false)} />
-            <div
-              className="absolute right-0 top-full mt-1 z-[101] w-56 py-1 rounded-lg shadow-xl max-h-80 overflow-y-auto"
-              style={{
-                backgroundColor: theme.ui.surface,
-                border: `1px solid ${theme.ui.border}`,
-              }}
-            >
-              {/* WSL Distros */}
-              {wslDistros.length > 0 && (
-                <>
-                  <div
-                    className="px-3 py-1 text-[10px] uppercase tracking-wider"
-                    style={{ color: theme.ui.textSubtle }}
-                  >
-                    WSL Distributions
-                  </div>
-                  {wslDistros.map((distro) => (
-                    <button
-                      key={distro}
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors duration-150"
-                      style={{ color: theme.ui.text }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = theme.ui.surfaceHover;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }}
-                      onClick={() => {
-                        addTab("wsl", distro);
-                        setShowNewTabMenu(false);
-                      }}
-                    >
-                      <span style={{ color: theme.ui.accent }}>{shellIcons.wsl}</span>
-                      <span>{distro}</span>
-                    </button>
-                  ))}
-                  <div
-                    className="my-1"
-                    style={{ borderTop: `1px solid ${theme.ui.border}` }}
-                  />
-                </>
-              )}
+        <AnimatePresence>
+          {showNewTabMenu && (
+            <>
+              <div className="fixed inset-0 z-[100]" onClick={() => setShowNewTabMenu(false)} />
+              <motion.div
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-0 top-full mt-1 z-[101] w-56 py-1 rounded-lg shadow-2xl max-h-80 overflow-y-auto bg-popover border border-border"
+              >
+                {/* WSL Distros */}
+                {wslDistros.length > 0 && (
+                  <>
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                      WSL Distributions
+                    </div>
+                    {wslDistros.map((distro, i) => (
+                      <motion.button
+                        key={distro}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+                        onClick={() => {
+                          addTab("wsl", distro);
+                          setShowNewTabMenu(false);
+                        }}
+                      >
+                        <span className="text-primary">{shellIcons.wsl}</span>
+                        <span>{distro}</span>
+                      </motion.button>
+                    ))}
+                    <div className="my-1 border-t border-border" />
+                  </>
+                )}
 
-              {/* Other shells */}
-              <div
-                className="px-3 py-1 text-[10px] uppercase tracking-wider"
-                style={{ color: theme.ui.textSubtle }}
-              >
-                Other Shells
-              </div>
-              <button
-                className="w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors duration-150"
-                style={{ color: theme.ui.text }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.ui.surfaceHover;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-                onClick={() => {
-                  addTab("powershell");
-                  setShowNewTabMenu(false);
-                }}
-              >
-                <span style={{ color: theme.cyan }}>{shellIcons.powershell}</span>
-                <span>PowerShell</span>
-              </button>
-              <button
-                className="w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors duration-150"
-                style={{ color: theme.ui.text }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.ui.surfaceHover;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-                onClick={() => {
-                  addTab("cmd");
-                  setShowNewTabMenu(false);
-                }}
-              >
-                <span style={{ color: theme.ui.textMuted }}>{shellIcons.cmd}</span>
-                <span>Command Prompt</span>
-              </button>
-            </div>
-          </>
-        )}
+                {/* Other shells */}
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                  Other Shells
+                </div>
+                <motion.button
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.05 }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+                  onClick={() => {
+                    addTab("powershell");
+                    setShowNewTabMenu(false);
+                  }}
+                >
+                  <span style={{ color: theme.cyan }}>{shellIcons.powershell}</span>
+                  <span>PowerShell</span>
+                </motion.button>
+                <motion.button
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.08 }}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+                  onClick={() => {
+                    addTab("cmd");
+                    setShowNewTabMenu(false);
+                  }}
+                >
+                  <span className="text-muted-foreground">{shellIcons.cmd}</span>
+                  <span>Command Prompt</span>
+                </motion.button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Settings Button */}
-      <button
-        className="w-10 h-10 flex items-center justify-center transition-all duration-150"
-        style={{
-          color: theme.ui.textMuted,
-          borderLeft: `1px solid ${theme.ui.border}`,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = theme.ui.surfaceHover;
-          e.currentTarget.style.color = theme.ui.text;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "transparent";
-          e.currentTarget.style.color = theme.ui.textMuted;
-        }}
+      <motion.button
+        whileHover={{ scale: 1.05, rotate: 45 }}
+        whileTap={{ scale: 0.95 }}
+        transition={{ type: "spring", stiffness: 400 }}
+        className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary border-l border-border transition-colors"
         onClick={() => setShowSettings(true)}
         title="Settings (Ctrl+,)"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
-      </button>
+        <Settings className="w-4 h-4" />
+      </motion.button>
 
       {/* Settings Modal */}
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />

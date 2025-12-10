@@ -1,7 +1,22 @@
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Circle, Palette, ChevronUp, Check, Clock } from "lucide-react";
 import { useConfigStore } from "@/stores/configStore";
 import { themes } from "@/config/themes";
 import { useTheme } from "@/App";
+import { cn } from "@/lib/utils";
+
+interface KbdProps {
+  children: React.ReactNode;
+}
+
+function Kbd({ children }: KbdProps) {
+  return (
+    <kbd className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-secondary text-foreground">
+      {children}
+    </kbd>
+  );
+}
 
 export function StatusBar() {
   const { appearance, setTheme } = useConfigStore();
@@ -22,144 +37,181 @@ export function StatusBar() {
   }));
 
   return (
-    <div
-      className="flex items-center justify-between h-6 text-[10px]"
-      style={{
-        paddingLeft: "20px",
-        paddingRight: "20px",
-        backgroundColor: theme.ui.surface,
-        borderTop: `1px solid ${theme.ui.border}`,
-        color: theme.ui.textMuted,
-      }}
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4, duration: 0.3 }}
+      className="flex items-center justify-between h-7 px-5 text-[10px] bg-card border-t border-border text-muted-foreground"
     >
       {/* Left: Shell info */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1.5">
-          <div
-            className="w-2 h-2 rounded-full animate-pulse"
-            style={{ backgroundColor: theme.green }}
-          />
-          <span>Connected</span>
-        </div>
-        <span style={{ color: theme.ui.textSubtle }}>|</span>
-        <span>WSL2</span>
-        <span style={{ color: theme.ui.textSubtle }}>|</span>
-        <span className="font-mono">bash</span>
+      <div className="flex items-center gap-3">
+        <motion.div
+          className="flex items-center gap-1.5"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <motion.div
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <Circle
+              className="w-2 h-2"
+              fill={theme.green}
+              stroke={theme.green}
+            />
+          </motion.div>
+          <span className="text-foreground/80">Connected</span>
+        </motion.div>
+
+        <span className="text-border">|</span>
+
+        <span className="text-primary/80 font-medium">WSL2</span>
+
+        <span className="text-border">|</span>
+
+        <span className="font-mono text-muted-foreground">bash</span>
       </div>
 
       {/* Center: Shortcuts hint */}
-      <div className="flex items-center gap-3" style={{ color: theme.ui.textSubtle }}>
-        <span>
-          <kbd
-            className="px-1 py-0.5 rounded"
-            style={{ backgroundColor: theme.ui.surfaceHover, color: theme.ui.text }}
-          >
-            Ctrl+Shift+T
-          </kbd>{" "}
-          New tab
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6 }}
+        className="flex items-center gap-4 text-muted-foreground/60"
+      >
+        <span className="flex items-center gap-1">
+          <Kbd>Ctrl+Shift+T</Kbd>
+          <span>New tab</span>
         </span>
-        <span>
-          <kbd
-            className="px-1 py-0.5 rounded"
-            style={{ backgroundColor: theme.ui.surfaceHover, color: theme.ui.text }}
-          >
-            Ctrl+W
-          </kbd>{" "}
-          Close
+        <span className="flex items-center gap-1">
+          <Kbd>Ctrl+W</Kbd>
+          <span>Close</span>
         </span>
-      </div>
+        <span className="flex items-center gap-1">
+          <Kbd>Ctrl+,</Kbd>
+          <span>Settings</span>
+        </span>
+      </motion.div>
 
       {/* Right: Theme selector + Clock */}
-      <div className="flex items-center gap-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.7 }}
+        className="flex items-center gap-3"
+      >
         {/* Theme Selector */}
         <div className="relative z-50">
-          <button
-            className="flex items-center gap-1.5 transition-colors"
-            style={{ color: theme.ui.textMuted }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = theme.ui.text;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = theme.ui.textMuted;
-            }}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
             onClick={() => setShowThemeMenu(!showThemeMenu)}
           >
+            <Palette className="w-3 h-3" />
             <div
-              className="w-3 h-3 rounded-sm"
+              className="w-3 h-3 rounded-sm ring-1 ring-border"
               style={{
                 backgroundColor: themes[appearance.theme]?.background || theme.background,
-                border: `1px solid ${theme.ui.border}`,
               }}
             />
-            <span>{themes[appearance.theme]?.name || "Theme"}</span>
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor">
-              <path d="M1 2.5L4 5.5L7 2.5" stroke="currentColor" strokeWidth="1" fill="none" />
-            </svg>
-          </button>
+            <span className="max-w-[80px] truncate">
+              {themes[appearance.theme]?.name || "Theme"}
+            </span>
+            <motion.div
+              animate={{ rotate: showThemeMenu ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronUp className="w-3 h-3" />
+            </motion.div>
+          </motion.button>
 
-          {showThemeMenu && (
-            <>
-              <div
-                className="fixed inset-0 z-[100]"
-                onClick={() => setShowThemeMenu(false)}
-              />
-              <div
-                className="absolute bottom-full right-0 mb-1 z-[101] w-48 py-1 rounded-lg shadow-xl max-h-64 overflow-y-auto"
-                style={{
-                  backgroundColor: theme.ui.surface,
-                  border: `1px solid ${theme.ui.border}`,
-                }}
-              >
-                {themeList.map((t) => (
-                  <button
-                    key={t.id}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors"
-                    style={{
-                      color: appearance.theme === t.id ? theme.ui.text : theme.ui.textMuted,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = theme.ui.surfaceHover;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                    onClick={() => {
-                      setTheme(t.id);
-                      setShowThemeMenu(false);
-                    }}
-                  >
-                    <div
-                      className="w-4 h-4 rounded"
-                      style={{
-                        backgroundColor: t.bg,
-                        border: `1px solid ${theme.ui.border}`,
-                      }}
-                    >
-                      {appearance.theme === t.id && (
-                        <svg className="w-4 h-4" viewBox="0 0 16 16" fill={t.accent}>
-                          <path d="M6.5 11.5L3 8l1-1 2.5 2.5 5-5 1 1-6 6z" />
-                        </svg>
-                      )}
-                    </div>
-                    <span>{t.name}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          <AnimatePresence>
+            {showThemeMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-[100]"
+                  onClick={() => setShowThemeMenu(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute bottom-full right-0 mb-2 z-[101] w-52 py-1 rounded-lg shadow-2xl max-h-72 overflow-y-auto bg-popover border border-border"
+                >
+                  <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/60 border-b border-border">
+                    Select Theme
+                  </div>
+                  {themeList.map((t, index) => {
+                    const isSelected = appearance.theme === t.id;
+                    return (
+                      <motion.button
+                        key={t.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.02 }}
+                        className={cn(
+                          "w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors",
+                          isSelected ? "text-foreground bg-secondary/50" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        )}
+                        onClick={() => {
+                          setTheme(t.id);
+                          setShowThemeMenu(false);
+                        }}
+                      >
+                        <div
+                          className="w-5 h-5 rounded flex items-center justify-center ring-1 ring-border"
+                          style={{ backgroundColor: t.bg }}
+                        >
+                          {isSelected && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: "spring", duration: 0.3 }}
+                            >
+                              <Check className="w-3 h-3" style={{ color: t.accent }} />
+                            </motion.div>
+                          )}
+                        </div>
+                        <span className="flex-1 text-left">{t.name}</span>
+                        {isSelected && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: t.accent }}
+                          />
+                        )}
+                      </motion.button>
+                    );
+                  })}
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
 
-        <span style={{ color: theme.ui.textSubtle }}>|</span>
+        <span className="text-border">|</span>
 
         {/* Clock */}
-        <span className="font-mono tabular-nums">
-          {time.toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          })}
-        </span>
-      </div>
-    </div>
+        <motion.div
+          className="flex items-center gap-1.5 font-mono tabular-nums"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+        >
+          <Clock className="w-3 h-3 text-primary/60" />
+          <span>
+            {time.toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })}
+          </span>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }

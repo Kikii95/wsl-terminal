@@ -20,6 +20,30 @@ function App() {
   const { appearance } = useConfigStore();
   const theme = getTheme(appearance.theme);
 
+  // Sync CSS variables with current theme for shadcn/ui compatibility
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--background", theme.ui.background);
+    root.style.setProperty("--foreground", theme.ui.text);
+    root.style.setProperty("--card", theme.ui.surface);
+    root.style.setProperty("--card-foreground", theme.ui.text);
+    root.style.setProperty("--popover", theme.ui.surface);
+    root.style.setProperty("--popover-foreground", theme.ui.text);
+    root.style.setProperty("--primary", theme.ui.accent);
+    root.style.setProperty("--primary-foreground", theme.ui.background);
+    root.style.setProperty("--secondary", theme.ui.surfaceHover);
+    root.style.setProperty("--secondary-foreground", theme.ui.text);
+    root.style.setProperty("--muted", theme.ui.surfaceHover);
+    root.style.setProperty("--muted-foreground", theme.ui.textMuted);
+    root.style.setProperty("--accent", theme.ui.accent);
+    root.style.setProperty("--accent-foreground", theme.ui.background);
+    root.style.setProperty("--destructive", theme.red);
+    root.style.setProperty("--destructive-foreground", theme.ui.background);
+    root.style.setProperty("--border", theme.ui.border);
+    root.style.setProperty("--input", theme.ui.border);
+    root.style.setProperty("--ring", theme.ui.accent);
+  }, [theme]);
+
   // Create initial tab on mount
   useEffect(() => {
     if (tabs.length === 0) {
