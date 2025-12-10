@@ -1,0 +1,39 @@
+# WSL Terminal Configuration
+
+[shell]
+default = "wsl"
+
+[[shell.profiles]]
+name = "WSL"
+command = "wsl"
+args = ["-e", "bash", "-l"]
+
+[[shell.profiles]]
+name = "PowerShell"
+command = "powershell"
+args = ["-NoLogo"]
+
+[[shell.profiles]]
+name = "CMD"
+command = "cmd"
+args = ["/K"]
+
+[appearance]
+theme = "catppuccin-mocha"
+font_size = 14
+font_family = "JetBrains Mono, Fira Code, Cascadia Code, monospace"
+cursor_style = "block"  # block, underline, bar
+cursor_blink = true
+
+[keybindings]
+new_tab = "Ctrl+Shift+T"
+close_tab = "Ctrl+W"
+next_tab = "Ctrl+Tab"
+prev_tab = "Ctrl+Shift+Tab"
+copy = "Ctrl+Shift+C"
+paste = "Ctrl+Shift+V"
+
+[window]
+quake_mode = false
+quake_hotkey = "Ctrl+`"
+start_minimized = false
