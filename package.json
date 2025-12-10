@@ -1,6 +1,6 @@
 {
   "name": "wsl-terminal",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Modern WSL terminal emulator built with Tauri",
   "type": "module",
   "scripts": {

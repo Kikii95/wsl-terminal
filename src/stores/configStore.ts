@@ -57,6 +57,12 @@ export const useConfigStore = create<ConfigState>()(
   persist(
     (set) => ({
       ...defaultConfig,
+      // Ensure all nested objects exist with defaults
+      shell: defaultConfig.shell,
+      appearance: defaultConfig.appearance,
+      keybindings: defaultConfig.keybindings,
+      window: defaultConfig.window,
+      notifications: defaultConfig.notifications,
 
       setTheme: (theme) =>
         set((state) => ({
@@ -115,6 +121,19 @@ export const useConfigStore = create<ConfigState>()(
     }),
     {
       name: "wsl-terminal-config",
+      version: 2, // Bump this when adding new fields
+      merge: (persistedState, currentState) => {
+        // Deep merge persisted state with defaults to handle missing fields
+        const persisted = persistedState as Partial<Config>;
+        return {
+          ...currentState,
+          shell: { ...defaultConfig.shell, ...persisted?.shell },
+          appearance: { ...defaultConfig.appearance, ...persisted?.appearance },
+          keybindings: { ...defaultConfig.keybindings, ...persisted?.keybindings },
+          window: { ...defaultConfig.window, ...persisted?.window },
+          notifications: { ...defaultConfig.notifications, ...persisted?.notifications },
+        };
+      },
     }
   )
 );
