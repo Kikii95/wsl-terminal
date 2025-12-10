@@ -311,7 +311,6 @@ function App() {
         {/* SSH Sidebar */}
         <SSHSidebar
           isOpen={showSSHSidebar}
-          onToggle={() => setShowSSHSidebar(!showSSHSidebar)}
           onClose={() => setShowSSHSidebar(false)}
         />
       </div>

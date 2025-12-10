@@ -4,8 +4,6 @@ import {
   Server,
   Plus,
   Trash2,
-  ChevronRight,
-  ChevronLeft,
   Play,
   X,
 } from "lucide-react";
@@ -15,11 +13,10 @@ import { useTheme } from "@/App";
 
 interface SSHSidebarProps {
   isOpen: boolean;
-  onToggle: () => void;
   onClose: () => void;
 }
 
-export function SSHSidebar({ isOpen, onToggle, onClose }: SSHSidebarProps) {
+export function SSHSidebar({ isOpen, onClose }: SSHSidebarProps) {
   const theme = useTheme();
   const { connections, addConnection, removeConnection } = useSSHStore();
   const { addTab } = useTerminalStore();
@@ -49,26 +46,6 @@ export function SSHSidebar({ isOpen, onToggle, onClose }: SSHSidebarProps) {
 
   return (
     <>
-      {/* Toggle Button */}
-      <button
-        onClick={onToggle}
-        className="fixed left-0 top-1/2 -translate-y-1/2 z-50 p-1.5 rounded-r-lg transition-colors"
-        style={{
-          backgroundColor: theme.ui.surface,
-          color: theme.ui.textMuted,
-          borderTop: `1px solid ${theme.ui.border}`,
-          borderRight: `1px solid ${theme.ui.border}`,
-          borderBottom: `1px solid ${theme.ui.border}`,
-        }}
-        title="SSH Manager"
-      >
-        {isOpen ? (
-          <ChevronLeft className="w-4 h-4" />
-        ) : (
-          <ChevronRight className="w-4 h-4" />
-        )}
-      </button>
-
       {/* Overlay backdrop for click-outside */}
       <AnimatePresence>
         {isOpen && (

@@ -103,11 +103,14 @@ export function TabBar() {
                   className={cn(
                     "group relative flex items-center gap-2 h-8 rounded-lg cursor-pointer transition-all",
                     "min-w-[120px] max-w-[180px]",
-                    tabColor !== "transparent" ? "pl-4 pr-3" : "px-3",
                     isActive
                       ? "bg-background shadow-sm"
                       : "hover:bg-secondary/50"
                   )}
+                  style={{
+                    paddingLeft: tabColor !== "transparent" ? 16 : 12,
+                    paddingRight: 12,
+                  }}
                   onClick={() => setActiveTab(tab.id)}
                   onDoubleClick={() => handleDoubleClick(tab.id, tab.title)}
                   onContextMenu={(e) => handleContextMenu(e, tab.id)}
