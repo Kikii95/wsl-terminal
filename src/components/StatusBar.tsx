@@ -1,17 +1,26 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Circle, Palette, Check, Clock, Zap, Bell, GitBranch } from "lucide-react";
+import { Circle, Palette, Check, Clock, Zap, Bell, BellOff, GitBranch, ArrowUp, ArrowDown } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { useConfigStore } from "@/stores/configStore";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { themes } from "@/config/themes";
 import { useTheme } from "@/App";
 import { cn } from "@/lib/utils";
 
+interface GitInfo {
+  branch: string | null;
+  is_dirty: boolean;
+  ahead: number;
+  behind: number;
+}
+
 export function StatusBar() {
-  const { appearance, setTheme } = useConfigStore();
+  const { appearance, setTheme, notifications, setNotificationsEnabled } = useConfigStore();
   const { tabs, activeTabId } = useTerminalStore();
   const [time, setTime] = useState(new Date());
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   const theme = useTheme();
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -19,6 +28,22 @@ export function StatusBar() {
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Fetch git info periodically
+  useEffect(() => {
+    const fetchGitInfo = async () => {
+      try {
+        const info = await invoke<GitInfo>("get_git_info", { path: null });
+        setGitInfo(info);
+      } catch (e) {
+        setGitInfo(null);
+      }
+    };
+
+    fetchGitInfo();
+    const interval = setInterval(fetchGitInfo, 5000); // Refresh every 5s
+    return () => clearInterval(interval);
   }, []);
 
   const themeList = Object.entries(themes).map(([id, t]) => ({
@@ -59,11 +84,37 @@ export function StatusBar() {
 
         <span className="text-border">•</span>
 
-        {/* Git branch placeholder - future feature */}
-        <div className="flex items-center gap-1.5 text-muted-foreground/30 cursor-not-allowed" title="Git integration (Coming soon)">
-          <GitBranch className="w-3 h-3" />
-          <span className="italic">--</span>
-        </div>
+        {/* Git branch info */}
+        {gitInfo?.branch ? (
+          <div className="flex items-center gap-1.5" title={`Branch: ${gitInfo.branch}${gitInfo.is_dirty ? ' (modified)' : ''}`}>
+            <GitBranch className="w-3 h-3 text-primary/60" />
+            <span className="text-foreground/70 font-medium">
+              {gitInfo.branch}
+              {gitInfo.is_dirty && <span className="text-yellow-500">*</span>}
+            </span>
+            {(gitInfo.ahead > 0 || gitInfo.behind > 0) && (
+              <span className="flex items-center gap-0.5 text-muted-foreground/60">
+                {gitInfo.ahead > 0 && (
+                  <span className="flex items-center gap-0.5 text-green-500/80">
+                    <ArrowUp className="w-2.5 h-2.5" />
+                    {gitInfo.ahead}
+                  </span>
+                )}
+                {gitInfo.behind > 0 && (
+                  <span className="flex items-center gap-0.5 text-orange-500/80">
+                    <ArrowDown className="w-2.5 h-2.5" />
+                    {gitInfo.behind}
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-muted-foreground/30" title="Not a git repository">
+            <GitBranch className="w-3 h-3" />
+            <span className="italic">--</span>
+          </div>
+        )}
       </div>
 
       {/* Center: Keyboard shortcuts hint */}
@@ -81,13 +132,18 @@ export function StatusBar() {
 
       {/* Right: Theme + Notifications + Clock */}
       <div className="flex items-center gap-2">
-        {/* Notifications placeholder - future feature */}
+        {/* Notifications toggle */}
         <button
-          className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground/30 cursor-not-allowed"
-          title="Notifications (Coming soon)"
-          disabled
+          className={cn(
+            "w-5 h-5 rounded flex items-center justify-center transition-colors",
+            notifications?.enabled
+              ? "text-primary hover:text-primary/80"
+              : "text-muted-foreground/40 hover:text-muted-foreground"
+          )}
+          onClick={() => setNotificationsEnabled(!notifications?.enabled)}
+          title={notifications?.enabled ? `Notifications enabled (${notifications.minDuration}s+)` : "Notifications disabled"}
         >
-          <Bell className="w-3 h-3" />
+          {notifications?.enabled ? <Bell className="w-3 h-3" /> : <BellOff className="w-3 h-3" />}
         </button>
 
         {/* Theme Quick Switcher */}

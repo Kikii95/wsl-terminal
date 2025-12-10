@@ -8,7 +8,12 @@ interface ConfigState extends Config {
   setFontFamily: (family: string) => void;
   setCursorStyle: (style: "block" | "underline" | "bar") => void;
   setCursorBlink: (blink: boolean) => void;
+  setLigatures: (ligatures: boolean) => void;
   setDefaultShell: (shell: string) => void;
+  setQuakeMode: (enabled: boolean) => void;
+  setQuakeHotkey: (hotkey: string) => void;
+  setNotificationsEnabled: (enabled: boolean) => void;
+  setNotificationMinDuration: (seconds: number) => void;
 }
 
 const defaultConfig: Config = {
@@ -23,9 +28,10 @@ const defaultConfig: Config = {
   appearance: {
     theme: "catppuccin-mocha",
     fontSize: 14,
-    fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
+    fontFamily: '"Fira Code", "JetBrains Mono", "Cascadia Code", monospace',
     cursorStyle: "block",
     cursorBlink: true,
+    ligatures: true,
   },
   keybindings: {
     new_tab: "Ctrl+Shift+T",
@@ -39,6 +45,11 @@ const defaultConfig: Config = {
     quakeMode: false,
     quakeHotkey: "Ctrl+`",
     startMinimized: false,
+  },
+  notifications: {
+    enabled: true,
+    minDuration: 5, // Notify for commands that take > 5 seconds
+    onlyWhenUnfocused: true,
   },
 };
 
@@ -72,9 +83,34 @@ export const useConfigStore = create<ConfigState>()(
           appearance: { ...state.appearance, cursorBlink },
         })),
 
+      setLigatures: (ligatures) =>
+        set((state) => ({
+          appearance: { ...state.appearance, ligatures },
+        })),
+
       setDefaultShell: (shell) =>
         set((state) => ({
           shell: { ...state.shell, default: shell },
+        })),
+
+      setQuakeMode: (quakeMode) =>
+        set((state) => ({
+          window: { ...state.window, quakeMode },
+        })),
+
+      setQuakeHotkey: (quakeHotkey) =>
+        set((state) => ({
+          window: { ...state.window, quakeHotkey },
+        })),
+
+      setNotificationsEnabled: (enabled) =>
+        set((state) => ({
+          notifications: { ...state.notifications, enabled },
+        })),
+
+      setNotificationMinDuration: (minDuration) =>
+        set((state) => ({
+          notifications: { ...state.notifications, minDuration },
         })),
     }),
     {

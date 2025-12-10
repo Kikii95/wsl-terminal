@@ -1,0 +1,75 @@
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import type { PaneNode } from "@/types/terminal";
+import { Terminal } from "./Terminal";
+import { usePaneStore } from "@/stores/paneStore";
+import { useTheme } from "@/App";
+
+interface PaneContainerProps {
+  tabId: string;
+  node: PaneNode;
+  isTabActive: boolean;
+}
+
+export function PaneContainer({ tabId, node, isTabActive }: PaneContainerProps) {
+  const theme = useTheme();
+  const { panes, setActivePane } = usePaneStore();
+  const tabPane = panes[tabId];
+  const activePaneId = tabPane?.activePaneId;
+
+  if (node.type === "terminal") {
+    const isActive = isTabActive && activePaneId === node.id;
+
+    return (
+      <div
+        className="h-full w-full relative"
+        onClick={() => setActivePane(tabId, node.id)}
+        style={{
+          outline: isActive ? `2px solid ${theme.ui.accent}40` : "none",
+          outlineOffset: "-2px",
+        }}
+      >
+        <Terminal
+          tabId={node.id}
+          shell={node.shell || "wsl"}
+          distro={node.distro}
+          isActive={isActive}
+        />
+      </div>
+    );
+  }
+
+  // Split node
+  const direction = node.direction === "horizontal" ? "horizontal" : "vertical";
+
+  return (
+    <PanelGroup direction={direction} className="h-full w-full">
+      {node.children?.map((child, index) => (
+        <div key={child.id} className="contents">
+          <Panel defaultSize={node.sizes?.[index] || 50} minSize={10}>
+            <PaneContainer
+              tabId={tabId}
+              node={child}
+              isTabActive={isTabActive}
+            />
+          </Panel>
+          {index < (node.children?.length || 0) - 1 && (
+            <PanelResizeHandle
+              className={`
+                ${direction === "horizontal" ? "w-1" : "h-1"}
+                bg-border/50 hover:bg-primary/50 transition-colors
+                flex items-center justify-center
+              `}
+            >
+              <div
+                className={`
+                  ${direction === "horizontal" ? "w-0.5 h-8" : "w-8 h-0.5"}
+                  bg-muted-foreground/30 rounded-full
+                `}
+              />
+            </PanelResizeHandle>
+          )}
+        </div>
+      ))}
+    </PanelGroup>
+  );
+}

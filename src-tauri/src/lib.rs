@@ -212,11 +212,117 @@ async fn kill_shell(tab_id: String, state: tauri::State<'_, AppState>) -> Result
     Ok(())
 }
 
+#[derive(serde::Serialize)]
+struct GitInfo {
+    branch: Option<String>,
+    is_dirty: bool,
+    ahead: u32,
+    behind: u32,
+}
+
+#[tauri::command]
+async fn get_git_info(path: Option<String>) -> Result<GitInfo, String> {
+    let cwd = path.unwrap_or_else(|| {
+        std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string())
+    });
+
+    // Get current branch
+    let branch_output = std::process::Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(&cwd)
+        .output();
+
+    let branch = match branch_output {
+        Ok(output) if output.status.success() => {
+            Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        }
+        _ => None,
+    };
+
+    if branch.is_none() {
+        return Ok(GitInfo {
+            branch: None,
+            is_dirty: false,
+            ahead: 0,
+            behind: 0,
+        });
+    }
+
+    // Check if dirty (uncommitted changes)
+    let status_output = std::process::Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(&cwd)
+        .output();
+
+    let is_dirty = match status_output {
+        Ok(output) => !output.stdout.is_empty(),
+        _ => false,
+    };
+
+    // Get ahead/behind count
+    let ahead_behind = std::process::Command::new("git")
+        .args(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
+        .current_dir(&cwd)
+        .output();
+
+    let (ahead, behind) = match ahead_behind {
+        Ok(output) if output.status.success() => {
+            let text = String::from_utf8_lossy(&output.stdout);
+            let parts: Vec<&str> = text.trim().split('\t').collect();
+            if parts.len() == 2 {
+                (
+                    parts[0].parse().unwrap_or(0),
+                    parts[1].parse().unwrap_or(0),
+                )
+            } else {
+                (0, 0)
+            }
+        }
+        _ => (0, 0),
+    };
+
+    Ok(GitInfo {
+        branch,
+        is_dirty,
+        ahead,
+        behind,
+    })
+}
+
+#[tauri::command]
+async fn toggle_quake_mode(window: tauri::Window) -> Result<(), String> {
+    if window.is_visible().map_err(|e| e.to_string())? {
+        window.hide().map_err(|e| e.to_string())?;
+    } else {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn set_quake_position(window: tauri::Window, height_percent: f64) -> Result<(), String> {
+    use tauri::PhysicalPosition;
+
+    // Get primary monitor
+    if let Some(monitor) = window.primary_monitor().map_err(|e| e.to_string())? {
+        let monitor_size = monitor.size();
+        let new_height = (monitor_size.height as f64 * height_percent / 100.0) as u32;
+
+        // Set window to top of screen, full width
+        window.set_position(PhysicalPosition::new(0, 0)).map_err(|e| e.to_string())?;
+        window.set_size(tauri::PhysicalSize::new(monitor_size.width, new_height)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .manage(AppState {
             processes: Arc::new(Mutex::new(HashMap::new())),
         })
@@ -225,7 +331,10 @@ pub fn run() {
             write_to_shell,
             resize_pty,
             kill_shell,
-            get_wsl_distros
+            get_wsl_distros,
+            get_git_info,
+            toggle_quake_mode,
+            set_quake_position
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

@@ -1,6 +1,6 @@
 [package]
 name = "wsl-terminal"
-version = "0.2.0"
+version = "0.3.0"
 description = "Modern WSL terminal emulator"
 authors = []
 license = "MIT"
@@ -23,6 +23,8 @@ tauri = { version = "2", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-clipboard-manager = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-notification = "2"
 tokio = { version = "1", features = ["full"] }
 toml = "0.8"
 dirs = "6"

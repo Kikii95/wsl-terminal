@@ -1,12 +1,16 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { SearchAddon } from "@xterm/addon-search";
+import { LigaturesAddon } from "@xterm/addon-ligatures";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { writeText, readText } from "@tauri-apps/plugin-clipboard-manager";
 import { useConfigStore } from "@/stores/configStore";
 import { getTheme } from "@/config/themes";
+import { useCommandNotification } from "@/hooks/useNotifications";
+import { SearchBar } from "./SearchBar";
 import "@xterm/xterm/css/xterm.css";
 
 interface TerminalProps {
@@ -20,12 +24,19 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const ligaturesAddonRef = useRef<LigaturesAddon | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
   const shellSpawnedRef = useRef(false);
   const resizeTimeoutRef = useRef<number | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
 
   const { appearance } = useConfigStore();
   const theme = getTheme(appearance.theme);
+
+  // Notification system for long-running commands
+  const tabTitle = shell === "wsl" ? (distro || "WSL") : shell.toUpperCase();
+  const { onCommandStart, onOutput, cleanup: cleanupNotification } = useCommandNotification(tabTitle);
 
   const writeToShell = useCallback(
     async (data: string) => {
@@ -65,9 +76,18 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
 
     const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
+    const searchAddon = new SearchAddon();
 
     xterm.loadAddon(fitAddon);
     xterm.loadAddon(webLinksAddon);
+    xterm.loadAddon(searchAddon);
+
+    // Load ligatures addon if enabled
+    if (appearance.ligatures) {
+      const ligaturesAddon = new LigaturesAddon();
+      xterm.loadAddon(ligaturesAddon);
+      ligaturesAddonRef.current = ligaturesAddon;
+    }
 
     xterm.open(terminalRef.current);
 
@@ -78,6 +98,7 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
 
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
+    searchAddonRef.current = searchAddon;
 
     // Handle Ctrl+C: copy if selection exists, otherwise send SIGINT
     xterm.attachCustomKeyEventHandler((event) => {
@@ -104,11 +125,27 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
         return false; // Prevent default browser paste
       }
 
+      // Ctrl+F: open search
+      if (event.ctrlKey && event.key === "f" && event.type === "keydown") {
+        setShowSearch(true);
+        return false;
+      }
+
+      // Escape: close search
+      if (event.key === "Escape" && event.type === "keydown" && showSearch) {
+        setShowSearch(false);
+        return false;
+      }
+
       return true; // Allow all other keys
     });
 
     // Handle user input
     xterm.onData((data) => {
+      // Detect Enter key (start of command)
+      if (data === "\r" || data === "\n") {
+        onCommandStart();
+      }
       writeToShell(data);
     });
 
@@ -123,6 +160,8 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
         `shell-output-${tabId}`,
         (event) => {
           xterm.write(event.payload);
+          // Track output for notification system
+          onOutput();
         }
       );
     };
@@ -186,12 +225,15 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
       if (unlistenRef.current) {
         unlistenRef.current();
       }
+      cleanupNotification();
       invoke("kill_shell", { tabId }).catch(console.error);
       xterm.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
+      searchAddonRef.current = null;
+      ligaturesAddonRef.current = null;
     };
-  }, [tabId, shell, distro, writeToShell, resizePty]);
+  }, [tabId, shell, distro, writeToShell, resizePty, showSearch, appearance.ligatures, onCommandStart, onOutput, cleanupNotification]);
 
   // Focus terminal when tab becomes active
   useEffect(() => {
@@ -221,11 +263,37 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
     }
   }, [theme, appearance]);
 
+  const handleSearch = useCallback((query: string, direction: "next" | "prev") => {
+    if (!searchAddonRef.current || !query) return;
+    if (direction === "next") {
+      searchAddonRef.current.findNext(query, { caseSensitive: false, regex: false });
+    } else {
+      searchAddonRef.current.findPrevious(query, { caseSensitive: false, regex: false });
+    }
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    setShowSearch(false);
+    searchAddonRef.current?.clearDecorations();
+    xtermRef.current?.focus();
+  }, []);
+
   return (
-    <div
-      ref={terminalRef}
-      className={`h-full w-full ${isActive ? "" : "hidden"}`}
-      style={{ backgroundColor: theme.background }}
-    />
+    <div className={`h-full w-full relative ${isActive ? "" : "hidden"}`}>
+      {/* Search Bar */}
+      {showSearch && (
+        <SearchBar
+          onSearch={handleSearch}
+          onClose={handleCloseSearch}
+        />
+      )}
+
+      {/* Terminal */}
+      <div
+        ref={terminalRef}
+        className="h-full w-full"
+        style={{ backgroundColor: theme.background }}
+      />
+    </div>
   );
 }

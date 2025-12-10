@@ -1,12 +1,16 @@
-import { useEffect, createContext, useContext } from "react";
+import { useEffect, createContext, useContext, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Terminal as TerminalIcon } from "lucide-react";
 import { TitleBar } from "@/components/TitleBar";
 import { TabBar } from "@/components/TabBar";
-import { Terminal } from "@/components/Terminal";
+import { PaneContainer } from "@/components/PaneContainer";
 import { StatusBar } from "@/components/StatusBar";
+import { CommandPalette } from "@/components/CommandPalette";
+import { SSHSidebar } from "@/components/SSHSidebar";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useConfigStore } from "@/stores/configStore";
+import { usePaneStore } from "@/stores/paneStore";
+import { useQuakeMode } from "@/hooks/useQuakeMode";
 import { getTheme, AppTheme } from "@/config/themes";
 
 // Theme context for global access
@@ -20,7 +24,13 @@ export const useTheme = () => {
 function App() {
   const { tabs, activeTabId, addTab, removeTab, setActiveTab } = useTerminalStore();
   const { appearance } = useConfigStore();
+  const { panes, initTabPane, splitPane, closePane, removeTabPanes } = usePaneStore();
   const theme = getTheme(appearance.theme);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showSSHSidebar, setShowSSHSidebar] = useState(false);
+
+  // Initialize quake mode
+  useQuakeMode();
 
   // Sync CSS variables with current theme for shadcn/ui compatibility
   useEffect(() => {
@@ -52,6 +62,21 @@ function App() {
       addTab("wsl");
     }
   }, []);
+
+  // Initialize panes for new tabs
+  useEffect(() => {
+    tabs.forEach((tab) => {
+      if (!panes[tab.id]) {
+        initTabPane(tab.id, tab.shell, tab.distro);
+      }
+    });
+    // Clean up panes for removed tabs
+    Object.keys(panes).forEach((tabId) => {
+      if (!tabs.find((t) => t.id === tabId)) {
+        removeTabPanes(tabId);
+      }
+    });
+  }, [tabs, panes, initTabPane, removeTabPanes]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -96,11 +121,49 @@ function App() {
           setActiveTab(tabs[tabIndex].id);
         }
       }
+
+      // Ctrl+Shift+D: Split vertical
+      if (e.ctrlKey && e.shiftKey && e.key === "D" && activeTabId) {
+        e.preventDefault();
+        const tabPane = panes[activeTabId];
+        if (tabPane) {
+          const activeTab = tabs.find((t) => t.id === activeTabId);
+          splitPane(activeTabId, tabPane.activePaneId, "vertical", activeTab?.shell || "wsl", activeTab?.distro);
+        }
+      }
+
+      // Ctrl+Shift+E: Split horizontal
+      if (e.ctrlKey && e.shiftKey && e.key === "E" && activeTabId) {
+        e.preventDefault();
+        const tabPane = panes[activeTabId];
+        if (tabPane) {
+          const activeTab = tabs.find((t) => t.id === activeTabId);
+          splitPane(activeTabId, tabPane.activePaneId, "horizontal", activeTab?.shell || "wsl", activeTab?.distro);
+        }
+      }
+
+      // Ctrl+Shift+W: Close active pane
+      if (e.ctrlKey && e.shiftKey && e.key === "W" && activeTabId) {
+        e.preventDefault();
+        const tabPane = panes[activeTabId];
+        if (tabPane) {
+          const shouldCloseTab = closePane(activeTabId, tabPane.activePaneId);
+          if (shouldCloseTab) {
+            removeTab(activeTabId);
+          }
+        }
+      }
+
+      // Ctrl+Shift+P: Command Palette
+      if (e.ctrlKey && e.shiftKey && e.key === "P") {
+        e.preventDefault();
+        setShowCommandPalette(true);
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [tabs, activeTabId, addTab, removeTab, setActiveTab]);
+  }, [tabs, activeTabId, addTab, removeTab, setActiveTab, panes, splitPane, closePane, setShowCommandPalette]);
 
   return (
     <ThemeContext.Provider value={theme}>
@@ -129,15 +192,22 @@ function App() {
             >
               <AnimatePresence mode="wait">
                 {tabs.length > 0 ? (
-                  tabs.map((tab) => (
-                    <Terminal
-                      key={tab.id}
-                      tabId={tab.id}
-                      shell={tab.shell}
-                      distro={tab.distro}
-                      isActive={tab.id === activeTabId}
-                    />
-                  ))
+                  tabs.map((tab) => {
+                    const tabPane = panes[tab.id];
+                    if (!tabPane) return null;
+                    return (
+                      <div
+                        key={tab.id}
+                        className={tab.id === activeTabId ? "h-full w-full" : "hidden"}
+                      >
+                        <PaneContainer
+                          tabId={tab.id}
+                          node={tabPane.root}
+                          isTabActive={tab.id === activeTabId}
+                        />
+                      </div>
+                    );
+                  })
                 ) : (
                   /* Empty State */
                   <motion.div
@@ -225,6 +295,18 @@ function App() {
 
         {/* Footer: StatusBar */}
         <StatusBar />
+
+        {/* Command Palette */}
+        <CommandPalette
+          isOpen={showCommandPalette}
+          onClose={() => setShowCommandPalette(false)}
+        />
+
+        {/* SSH Sidebar */}
+        <SSHSidebar
+          isOpen={showSSHSidebar}
+          onToggle={() => setShowSSHSidebar(!showSSHSidebar)}
+        />
       </div>
     </ThemeContext.Provider>
   );

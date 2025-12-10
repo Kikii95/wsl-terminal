@@ -7,6 +7,27 @@ export interface Tab {
   color?: string;
 }
 
+// Split pane types
+export type SplitDirection = "horizontal" | "vertical";
+
+export interface PaneNode {
+  id: string;
+  type: "terminal" | "split";
+  // For terminal type
+  shell?: string;
+  distro?: string;
+  // For split type
+  direction?: SplitDirection;
+  children?: PaneNode[];
+  sizes?: number[];
+}
+
+export interface TabPane {
+  tabId: string;
+  root: PaneNode;
+  activePaneId: string;
+}
+
 export interface TerminalTheme {
   name: string;
   background: string;
@@ -43,12 +64,18 @@ export interface Config {
     fontFamily: string;
     cursorStyle: "block" | "underline" | "bar";
     cursorBlink: boolean;
+    ligatures: boolean;
   };
   keybindings: Record<string, string>;
   window: {
     quakeMode: boolean;
     quakeHotkey: string;
     startMinimized: boolean;
+  };
+  notifications: {
+    enabled: boolean;
+    minDuration: number; // Minimum command duration in seconds to trigger notification
+    onlyWhenUnfocused: boolean;
   };
 }
 
