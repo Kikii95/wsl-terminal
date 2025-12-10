@@ -61,7 +61,7 @@ export function TitleBar() {
           WSL Terminal
         </span>
         <span className="text-xs font-mono" style={{ color: theme.ui.textMuted }}>
-          v0.1.2
+          v0.1.3
         </span>
       </div>
 
