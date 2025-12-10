@@ -36,7 +36,7 @@ export function TitleBar() {
       }}
     >
       {/* Left: Logo + Title - Added more left padding */}
-      <div className="flex items-center gap-3 pl-5 pr-4" data-tauri-drag-region>
+      <div className="flex items-center gap-3 pl-6 pr-4" data-tauri-drag-region>
         <div
           className="flex items-center justify-center w-6 h-6 rounded"
           style={{
