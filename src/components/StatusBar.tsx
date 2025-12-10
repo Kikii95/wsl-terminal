@@ -31,7 +31,7 @@ export function StatusBar() {
   const currentTheme = themes[appearance.theme];
 
   return (
-    <div className="flex items-center justify-between h-6 px-3 text-[10px] bg-card/80 border-t border-border">
+    <div className="flex items-center justify-between h-6 text-[10px] bg-card/80 border-t border-border" style={{ paddingLeft: 16, paddingRight: 16 }}>
       {/* Left: Connection Status + Shell Info */}
       <div className="flex items-center gap-3">
         {/* Status indicator */}

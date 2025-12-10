@@ -32,7 +32,8 @@ export function TitleBar() {
     >
       {/* Left: Logo + Title */}
       <div
-        className="flex items-center gap-3 pl-4"
+        className="flex items-center gap-3"
+        style={{ paddingLeft: 16 }}
         data-tauri-drag-region
       >
         <motion.div
@@ -63,7 +64,7 @@ export function TitleBar() {
             WSL Terminal
           </span>
           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary/70">
-            v0.2.3
+            v0.2.4
           </span>
         </motion.div>
       </div>
