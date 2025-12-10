@@ -60,22 +60,22 @@ export function StatusBar() {
         <span className="text-border">•</span>
 
         {/* Git branch placeholder - future feature */}
-        <div className="flex items-center gap-1.5 text-muted-foreground/50">
+        <div className="flex items-center gap-1.5 text-muted-foreground/30 cursor-not-allowed" title="Git integration (Coming soon)">
           <GitBranch className="w-3 h-3" />
-          <span>main</span>
+          <span className="italic">--</span>
         </div>
       </div>
 
       {/* Center: Keyboard shortcuts hint */}
       <div className="hidden md:flex items-center gap-4 text-muted-foreground/40">
         <span>
-          <kbd className="px-1 py-0.5 rounded text-[8px] bg-secondary/50 text-muted-foreground">⌘T</kbd> new
+          <kbd className="px-1 py-0.5 rounded text-[8px] bg-secondary/50 text-muted-foreground">Ctrl+T</kbd> new
         </span>
         <span>
-          <kbd className="px-1 py-0.5 rounded text-[8px] bg-secondary/50 text-muted-foreground">⌘W</kbd> close
+          <kbd className="px-1 py-0.5 rounded text-[8px] bg-secondary/50 text-muted-foreground">Ctrl+W</kbd> close
         </span>
         <span>
-          <kbd className="px-1 py-0.5 rounded text-[8px] bg-secondary/50 text-muted-foreground">⌘,</kbd> settings
+          <kbd className="px-1 py-0.5 rounded text-[8px] bg-secondary/50 text-muted-foreground">Ctrl+Tab</kbd> switch
         </span>
       </div>
 

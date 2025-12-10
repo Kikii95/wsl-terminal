@@ -1,34 +1,8 @@
 import { useState, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { motion } from "framer-motion";
-import { Search, Command, PanelLeft } from "lucide-react";
+import { Minus, Square, X, Maximize2, Search, Command, PanelLeft } from "lucide-react";
 import { useTheme } from "@/App";
-
-interface TrafficLightProps {
-  color: "red" | "yellow" | "green";
-  onClick: () => void;
-  icon?: React.ReactNode;
-}
-
-function TrafficLight({ color, onClick, icon }: TrafficLightProps) {
-  const colors = {
-    red: { bg: "#ff5f57", hover: "#ff3b30" },
-    yellow: { bg: "#febc2e", hover: "#f59e0b" },
-    green: { bg: "#28c840", hover: "#22c55e" },
-  };
-
-  return (
-    <button
-      className="group w-3 h-3 rounded-full flex items-center justify-center transition-all hover:brightness-110"
-      style={{ backgroundColor: colors[color].bg }}
-      onClick={onClick}
-    >
-      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-black/60 text-[8px] font-bold">
-        {icon}
-      </span>
-    </button>
-  );
-}
 
 export function TitleBar() {
   const appWindow = getCurrentWindow();
@@ -53,43 +27,22 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="flex items-center h-11 px-4 select-none"
+      className="flex items-center justify-between h-10 select-none"
       style={{ backgroundColor: theme.ui.surface }}
     >
-      {/* Left: Traffic Lights */}
-      <div className="flex items-center gap-2" data-tauri-drag-region>
-        <div className="flex items-center gap-1.5">
-          <TrafficLight
-            color="red"
-            onClick={() => appWindow.close()}
-            icon="✕"
-          />
-          <TrafficLight
-            color="yellow"
-            onClick={() => appWindow.minimize()}
-            icon="−"
-          />
-          <TrafficLight
-            color="green"
-            onClick={() => appWindow.toggleMaximize()}
-            icon={isMaximized ? "↙" : "↗"}
-          />
-        </div>
-      </div>
-
-      {/* Center: Title + Version */}
+      {/* Left: Logo + Title */}
       <div
-        className="flex-1 flex items-center justify-center gap-3"
+        className="flex items-center gap-3 pl-4"
         data-tauri-drag-region
       >
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
           className="flex items-center gap-2"
         >
           {/* Logo */}
           <div
-            className="w-5 h-5 rounded-md flex items-center justify-center"
+            className="w-5 h-5 rounded flex items-center justify-center"
             style={{
               background: `linear-gradient(135deg, ${theme.ui.accent}, ${theme.magenta})`,
             }}
@@ -109,39 +62,69 @@ export function TitleBar() {
           <span className="text-xs font-medium text-foreground/80">
             WSL Terminal
           </span>
-          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-primary/10 text-primary/70">
-            v0.2.0
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary/70">
+            v0.2.1
           </span>
         </motion.div>
       </div>
 
-      {/* Right: Quick Actions (future: search, command palette, sidebar toggle) */}
-      <div className="flex items-center gap-1">
-        {/* Search - future feature */}
+      {/* Center: Future actions (search, command palette, sidebar) */}
+      <div
+        className="flex-1 flex items-center justify-center gap-1"
+        data-tauri-drag-region
+      >
+        {/* Placeholders for future features - disabled for now */}
         <button
-          className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground hover:bg-secondary/50 transition-colors opacity-50 cursor-not-allowed"
+          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground/30 cursor-not-allowed"
           title="Search (Coming soon)"
           disabled
         >
           <Search className="w-3.5 h-3.5" />
         </button>
-
-        {/* Command Palette - future feature */}
         <button
-          className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground hover:bg-secondary/50 transition-colors opacity-50 cursor-not-allowed"
+          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground/30 cursor-not-allowed"
           title="Command Palette (Coming soon)"
           disabled
         >
           <Command className="w-3.5 h-3.5" />
         </button>
-
-        {/* Sidebar Toggle - future feature */}
         <button
-          className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground hover:bg-secondary/50 transition-colors opacity-50 cursor-not-allowed"
+          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground/30 cursor-not-allowed"
           title="Toggle Sidebar (Coming soon)"
           disabled
         >
           <PanelLeft className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Right: Window Controls - Windows Style */}
+      <div className="flex h-full">
+        <button
+          className="w-12 h-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          onClick={() => appWindow.minimize()}
+          title="Minimize"
+        >
+          <Minus className="w-4 h-4" />
+        </button>
+
+        <button
+          className="w-12 h-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          onClick={() => appWindow.toggleMaximize()}
+          title={isMaximized ? "Restore" : "Maximize"}
+        >
+          {isMaximized ? (
+            <Maximize2 className="w-3.5 h-3.5" />
+          ) : (
+            <Square className="w-3.5 h-3.5" />
+          )}
+        </button>
+
+        <button
+          className="w-12 h-full flex items-center justify-center text-muted-foreground hover:text-white hover:bg-red-500 transition-colors"
+          onClick={() => appWindow.close()}
+          title="Close"
+        >
+          <X className="w-4 h-4" />
         </button>
       </div>
     </div>
