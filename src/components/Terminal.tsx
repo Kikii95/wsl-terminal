@@ -4,7 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { writeText, readText } from "@tauri-apps/plugin-clipboard-manager";
 import { useConfigStore } from "@/stores/configStore";
 import { getTheme } from "@/config/themes";
 import "@xterm/xterm/css/xterm.css";
@@ -96,8 +96,12 @@ export function Terminal({ tabId, shell, distro, isActive }: TerminalProps) {
 
       // Ctrl+V: paste from clipboard
       if (event.ctrlKey && event.key === "v" && event.type === "keydown") {
-        // Let the browser handle paste, xterm will receive it
-        return true;
+        readText().then((text) => {
+          if (text) {
+            writeToShell(text);
+          }
+        }).catch(console.error);
+        return false; // Prevent default browser paste
       }
 
       return true; // Allow all other keys

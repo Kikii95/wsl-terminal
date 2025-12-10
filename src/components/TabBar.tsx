@@ -110,18 +110,25 @@ export function TabBar() {
                   onClick={() => setActiveTab(tab.id)}
                   onDoubleClick={() => handleDoubleClick(tab.id, tab.title)}
                   onContextMenu={(e) => handleContextMenu(e, tab.id)}
+                  onMouseDown={(e) => {
+                    // Middle-click to close tab
+                    if (e.button === 1) {
+                      e.preventDefault();
+                      removeTab(tab.id);
+                    }
+                  }}
                 >
-                  {/* Color indicator */}
+                  {/* Color indicator - more visible */}
                   {tabColor !== "transparent" && (
                     <div
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
-                      style={{ backgroundColor: tabColor }}
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-sm"
+                      style={{ backgroundColor: tabColor, boxShadow: `0 0 6px ${tabColor}` }}
                     />
                   )}
 
-                  {/* Shell icon */}
+                  {/* Shell icon - with left padding for color indicator */}
                   <ShellIcon
-                    className="w-3.5 h-3.5 flex-shrink-0"
+                    className="w-3.5 h-3.5 flex-shrink-0 ml-1"
                     style={{ color: isActive ? config.color : "currentColor" }}
                   />
 

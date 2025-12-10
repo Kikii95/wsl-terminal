@@ -98,7 +98,7 @@ export function StatusBar() {
             title="Change theme"
           >
             <div
-              className="w-3 h-3 rounded-sm"
+              className="w-3 h-3 rounded-sm border border-muted-foreground/40"
               style={{ backgroundColor: currentTheme?.background || theme.background }}
             />
             <Palette className="w-3 h-3 text-muted-foreground" />
@@ -138,7 +138,7 @@ export function StatusBar() {
                           }}
                         >
                           <div
-                            className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
+                            className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border border-muted-foreground/30"
                             style={{ backgroundColor: t.bg }}
                           >
                             {isSelected && <Check className="w-2.5 h-2.5" style={{ color: t.accent }} />}
