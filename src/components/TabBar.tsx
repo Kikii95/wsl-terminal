@@ -100,11 +100,9 @@ function Tab({
       <div className="w-px h-4 flex-shrink-0 bg-border/30" />
 
       {/* Color dot */}
-      <div className="relative z-50">
-        <motion.button
-          whileHover={{ scale: 1.2 }}
-          whileTap={{ scale: 0.9 }}
-          className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10 hover:ring-white/30 transition-all"
+      <div className="relative">
+        <button
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10 hover:ring-white/30 hover:ring-2 transition-all"
           style={{ backgroundColor: tabColor }}
           onClick={(e) => {
             e.stopPropagation();
@@ -113,30 +111,28 @@ function Tab({
           title="Change color"
         />
 
-        {/* Color picker dropdown */}
+        {/* Color picker dropdown - positioned BELOW to avoid titlebar clipping */}
         <AnimatePresence>
           {showColorPicker && (
             <>
               <div
-                className="fixed inset-0 z-[100]"
+                className="fixed inset-0 z-[200]"
                 onClick={(e) => {
                   e.stopPropagation();
                   onColorPickerToggle();
                 }}
               />
               <motion.div
-                initial={{ opacity: 0, y: 5, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 5, scale: 0.9 }}
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
                 transition={{ duration: 0.15 }}
-                className="absolute left-0 bottom-full mb-2 z-[101] p-2 rounded-lg shadow-2xl bg-popover border border-border flex gap-1.5"
+                className="absolute left-0 top-full mt-2 z-[201] p-2 rounded-lg shadow-2xl bg-popover border border-border flex gap-1.5"
               >
                 {TAB_COLORS.map((c) => (
-                  <motion.button
+                  <button
                     key={c.id}
-                    whileHover={{ scale: 1.15 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="w-5 h-5 rounded-full ring-1 ring-white/10 hover:ring-white/40 transition-all cursor-pointer"
+                    className="w-5 h-5 rounded-full ring-1 ring-white/10 hover:ring-white/40 hover:ring-2 transition-all cursor-pointer"
                     style={{ backgroundColor: c.color }}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -180,9 +176,7 @@ function Tab({
       )}
 
       {/* Close button */}
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
+      <button
         className={cn(
           "w-5 h-5 flex items-center justify-center rounded flex-shrink-0 transition-all duration-150",
           "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
@@ -195,7 +189,7 @@ function Tab({
         title="Close (Ctrl+W)"
       >
         <X className="w-3 h-3" />
-      </motion.button>
+      </button>
     </motion.div>
   );
 }
@@ -265,15 +259,13 @@ export function TabBar() {
 
       {/* New Tab Button */}
       <div className="relative z-50">
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <button
           className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           onClick={() => setShowNewTabMenu(!showNewTabMenu)}
           title="New Tab (Ctrl+Shift+T)"
         >
           <Plus className="w-4 h-4" />
-        </motion.button>
+        </button>
 
         {/* Dropdown Menu */}
         <AnimatePresence>
@@ -350,16 +342,13 @@ export function TabBar() {
       </div>
 
       {/* Settings Button */}
-      <motion.button
-        whileHover={{ scale: 1.05, rotate: 45 }}
-        whileTap={{ scale: 0.95 }}
-        transition={{ type: "spring", stiffness: 400 }}
+      <button
         className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary border-l border-border transition-colors"
         onClick={() => setShowSettings(true)}
         title="Settings (Ctrl+,)"
       >
         <Settings className="w-4 h-4" />
-      </motion.button>
+      </button>
 
       {/* Settings Modal */}
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
