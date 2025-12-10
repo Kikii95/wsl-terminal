@@ -5,6 +5,7 @@ import { useTerminalStore } from "@/stores/terminalStore";
 import { useConfigStore } from "@/stores/configStore";
 import { usePaneStore } from "@/stores/paneStore";
 import { useSSHStore } from "@/stores/sshStore";
+import { useToastStore } from "@/stores/toastStore";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface McpActionPayload {
@@ -20,8 +21,10 @@ export function useMcpHandler() {
     removeTab,
     setActiveTab,
     updateTabTitle,
+    reorderTabs,
   } = useTerminalStore();
   const { appearance, setTheme } = useConfigStore();
+  const { addToast } = useToastStore();
   const { panes, splitPane } = usePaneStore();
   const { connections, addConnection, removeConnection } = useSSHStore();
 
@@ -230,6 +233,31 @@ export function useMcpHandler() {
             break;
           }
 
+          case "reorder_tabs": {
+            const fromIndex = payload.from_index as number;
+            const toIndex = payload.to_index as number;
+            if (typeof fromIndex === "number" && typeof toIndex === "number") {
+              reorderTabs(fromIndex, toIndex);
+              response = { success: true };
+            } else {
+              response = { success: false, error: "Invalid indices" };
+            }
+            break;
+          }
+
+          case "show_toast": {
+            const message = payload.message as string;
+            const type = (payload.type as "success" | "error" | "info" | "warning") || "info";
+            const duration = (payload.duration as number) || 3000;
+            if (message) {
+              addToast(message, type, duration);
+              response = { success: true };
+            } else {
+              response = { success: false, error: "Message required" };
+            }
+            break;
+          }
+
           default:
             response = { error: `Unknown action: ${action}` };
         }
@@ -253,6 +281,8 @@ export function useMcpHandler() {
       removeConnection,
       panes,
       splitPane,
+      reorderTabs,
+      addToast,
     ]
   );
 

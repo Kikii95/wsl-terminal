@@ -9,6 +9,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { QuickCommands } from "@/components/QuickCommands";
 import { ProjectSwitcher } from "@/components/ProjectSwitcher";
 import { SSHSidebar } from "@/components/SSHSidebar";
+import { ToastContainer } from "@/components/ToastContainer";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useConfigStore } from "@/stores/configStore";
 import { usePaneStore } from "@/stores/paneStore";
@@ -349,6 +350,9 @@ function App() {
           isOpen={showSSHSidebar}
           onClose={() => setShowSSHSidebar(false)}
         />
+
+        {/* Toast Notifications */}
+        <ToastContainer />
       </div>
     </ThemeContext.Provider>
   );
