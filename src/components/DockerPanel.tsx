@@ -288,19 +288,22 @@ export function DockerPanel({ isOpen, onClose }: DockerPanelProps) {
           {error && (
             <div className="p-4">
               <div
-                className="flex items-center gap-2 p-3 rounded-lg"
+                className="flex items-start gap-2 p-3 rounded-lg overflow-hidden"
                 style={{ backgroundColor: `${theme.red}20`, color: theme.red }}
               >
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span className="text-sm">{error}</span>
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="text-sm break-words whitespace-pre-wrap overflow-hidden" style={{ wordBreak: "break-word" }}>{error}</span>
               </div>
             </div>
           )}
 
           {dockerAvailable && (
-            <div className="p-3 space-y-3">
+            <div className="p-3 space-y-4">
               {/* Containers */}
-              <div>
+              <div
+                className="rounded-lg p-3"
+                style={{ backgroundColor: `${theme.ui.background}80`, border: `1px solid ${theme.ui.border}` }}
+              >
                 <button
                   onClick={() => toggleSection("containers")}
                   className="flex items-center gap-2 w-full text-left mb-2"
@@ -414,7 +417,10 @@ export function DockerPanel({ isOpen, onClose }: DockerPanelProps) {
               </div>
 
               {/* Images */}
-              <div>
+              <div
+                className="rounded-lg p-3"
+                style={{ backgroundColor: `${theme.ui.background}80`, border: `1px solid ${theme.ui.border}` }}
+              >
                 <button
                   onClick={() => toggleSection("images")}
                   className="flex items-center gap-2 w-full text-left mb-2"
@@ -456,7 +462,10 @@ export function DockerPanel({ isOpen, onClose }: DockerPanelProps) {
               </div>
 
               {/* Volumes */}
-              <div>
+              <div
+                className="rounded-lg p-3"
+                style={{ backgroundColor: `${theme.ui.background}80`, border: `1px solid ${theme.ui.border}` }}
+              >
                 <button
                   onClick={() => toggleSection("volumes")}
                   className="flex items-center gap-2 w-full text-left mb-2"

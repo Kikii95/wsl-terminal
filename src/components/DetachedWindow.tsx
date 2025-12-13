@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { MouseEvent } from "react";
 import { X, Minimize2, Maximize2, Pin, PinOff, CornerDownLeft } from "lucide-react";
 import { Terminal } from "./Terminal";
 import { useTheme } from "@/App";
@@ -69,6 +70,21 @@ export function DetachedWindow({ tab, windowId }: DetachedWindowProps) {
     }
   };
 
+  // Handle window drag manually (data-tauri-drag-region doesn't work well with child elements)
+  const handleDragStart = useCallback(async (e: MouseEvent<HTMLDivElement>) => {
+    // Only start drag on left click, and only if not clicking on a button
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button")) return;
+
+    try {
+      const win = getCurrentWindow();
+      await win.startDragging();
+    } catch (err) {
+      console.error("Failed to start dragging:", err);
+    }
+  }, []);
+
   return (
     <div
       className="h-screen w-screen flex flex-col overflow-hidden"
@@ -79,19 +95,18 @@ export function DetachedWindow({ tab, windowId }: DetachedWindowProps) {
     >
       {/* Title Bar */}
       <div
-        className="flex items-center justify-between h-10 px-3 select-none"
-        data-tauri-drag-region
+        className="flex items-center justify-between h-10 px-3 select-none cursor-default"
+        onMouseDown={handleDragStart}
         style={{
           backgroundColor: theme.ui.surface,
           borderBottom: `1px solid ${theme.ui.border}`,
         }}
       >
         {/* Left: Title */}
-        <div className="flex items-center gap-2" data-tauri-drag-region>
+        <div className="flex items-center gap-2">
           <span
             className="text-sm font-medium"
             style={{ color: theme.ui.text }}
-            data-tauri-drag-region
           >
             {tab.title}
           </span>
@@ -169,6 +184,7 @@ export function DetachedWindow({ tab, windowId }: DetachedWindowProps) {
           shell={tab.shell}
           distro={tab.distro}
           isActive={true}
+          skipSpawn={true}
         />
       </div>
     </div>

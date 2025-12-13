@@ -24,6 +24,22 @@ fn silent_command(program: &str) -> std::process::Command {
     cmd
 }
 
+/// Execute a command through WSL (for Linux paths like /home/user/...)
+/// Returns (stdout, stderr, success)
+fn wsl_git_command(args: &[&str], wsl_path: &str) -> Result<std::process::Output, std::io::Error> {
+    // Build the git command to run inside WSL
+    let git_cmd = format!("cd '{}' && git {}", wsl_path, args.join(" "));
+
+    silent_command("wsl.exe")
+        .args(["-e", "bash", "-c", &git_cmd])
+        .output()
+}
+
+/// Check if a path is a WSL Linux path (starts with /)
+fn is_wsl_path(path: &str) -> bool {
+    path.starts_with('/') && !path.starts_with("//")
+}
+
 struct PtyProcess {
     writer: Box<dyn Write + Send>,
     _pair: portable_pty::PtyPair,
@@ -828,6 +844,7 @@ async fn create_detached_window(
     .decorations(false)
     .transparent(true)
     .shadow(true)
+    .resizable(true)
     .center()
     .build()
     .map_err(|e| format!("Failed to create window: {}", e))?;
@@ -943,12 +960,19 @@ struct GitCommit {
 /// Get comprehensive git status
 #[tauri::command]
 async fn git_status(cwd: String) -> Result<GitStatusResult, String> {
+    let use_wsl = is_wsl_path(&cwd);
+
     // Get branch info
-    let branch_output = silent_command("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Git not available: {}", e))?;
+    let branch_output = if use_wsl {
+        wsl_git_command(&["rev-parse", "--abbrev-ref", "HEAD"], &cwd)
+            .map_err(|e| format!("Git not available: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Git not available: {}", e))?
+    };
 
     if !branch_output.status.success() {
         return Err("Not a git repository".to_string());
@@ -957,24 +981,34 @@ async fn git_status(cwd: String) -> Result<GitStatusResult, String> {
     let branch = String::from_utf8_lossy(&branch_output.stdout).trim().to_string();
 
     // Get upstream
-    let upstream_output = silent_command("git")
-        .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"])
-        .current_dir(&cwd)
-        .output();
+    let upstream_output = if use_wsl {
+        wsl_git_command(&["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], &cwd).ok()
+    } else {
+        silent_command("git")
+            .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"])
+            .current_dir(&cwd)
+            .output()
+            .ok()
+    };
 
-    let upstream = upstream_output.ok()
+    let upstream = upstream_output
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
 
     // Get ahead/behind
     let (ahead, behind) = if upstream.is_some() {
-        let ab_output = silent_command("git")
-            .args(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
-            .current_dir(&cwd)
-            .output();
+        let ab_output = if use_wsl {
+            wsl_git_command(&["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], &cwd).ok()
+        } else {
+            silent_command("git")
+                .args(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
+                .current_dir(&cwd)
+                .output()
+                .ok()
+        };
 
         match ab_output {
-            Ok(o) if o.status.success() => {
+            Some(o) if o.status.success() => {
                 let text = String::from_utf8_lossy(&o.stdout);
                 let parts: Vec<&str> = text.trim().split('\t').collect();
                 if parts.len() == 2 {
@@ -989,12 +1023,17 @@ async fn git_status(cwd: String) -> Result<GitStatusResult, String> {
         (0, 0)
     };
 
-    // Get file status (porcelain v2 for better parsing)
-    let status_output = silent_command("git")
-        .args(["status", "--porcelain=v1"])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to get status: {}", e))?;
+    // Get file status (porcelain v1 for better parsing)
+    let status_output = if use_wsl {
+        wsl_git_command(&["status", "--porcelain=v1"], &cwd)
+            .map_err(|e| format!("Failed to get status: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["status", "--porcelain=v1"])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to get status: {}", e))?
+    };
 
     let stdout = String::from_utf8_lossy(&status_output.stdout);
     let mut files = Vec::new();
@@ -1040,11 +1079,18 @@ async fn git_status(cwd: String) -> Result<GitStatusResult, String> {
 /// Get list of branches
 #[tauri::command]
 async fn git_branches(cwd: String) -> Result<Vec<GitBranch>, String> {
-    let output = silent_command("git")
-        .args(["branch", "-a", "--format=%(HEAD) %(refname:short) %(upstream:short)"])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to list branches: {}", e))?;
+    let use_wsl = is_wsl_path(&cwd);
+
+    let output = if use_wsl {
+        wsl_git_command(&["branch", "-a", "--format=%(HEAD) %(refname:short) %(upstream:short)"], &cwd)
+            .map_err(|e| format!("Failed to list branches: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["branch", "-a", "--format=%(HEAD) %(refname:short) %(upstream:short)"])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to list branches: {}", e))?
+    };
 
     if !output.status.success() {
         return Err("Failed to list branches".to_string());
@@ -1082,13 +1128,20 @@ async fn git_branches(cwd: String) -> Result<Vec<GitBranch>, String> {
 /// Get commit log
 #[tauri::command]
 async fn git_log(cwd: String, count: Option<u32>) -> Result<Vec<GitCommit>, String> {
+    let use_wsl = is_wsl_path(&cwd);
     let count_str = count.unwrap_or(20).to_string();
+    let count_arg = format!("-{}", count_str);
 
-    let output = silent_command("git")
-        .args(["log", &format!("-{}", count_str), "--format=%H|%h|%s|%an|%ar"])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to get log: {}", e))?;
+    let output = if use_wsl {
+        wsl_git_command(&["log", &count_arg, "--format=%H|%h|%s|%an|%ar"], &cwd)
+            .map_err(|e| format!("Failed to get log: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["log", &count_arg, "--format=%H|%h|%s|%an|%ar"])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to get log: {}", e))?
+    };
 
     if !output.status.success() {
         return Err("Failed to get log".to_string());
@@ -1116,11 +1169,18 @@ async fn git_log(cwd: String, count: Option<u32>) -> Result<Vec<GitCommit>, Stri
 /// Stage a file
 #[tauri::command]
 async fn git_stage(cwd: String, path: String) -> Result<(), String> {
-    let output = silent_command("git")
-        .args(["add", &path])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to stage: {}", e))?;
+    let use_wsl = is_wsl_path(&cwd);
+
+    let output = if use_wsl {
+        wsl_git_command(&["add", &path], &cwd)
+            .map_err(|e| format!("Failed to stage: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["add", &path])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to stage: {}", e))?
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -1133,11 +1193,18 @@ async fn git_stage(cwd: String, path: String) -> Result<(), String> {
 /// Stage all files
 #[tauri::command]
 async fn git_stage_all(cwd: String) -> Result<(), String> {
-    let output = silent_command("git")
-        .args(["add", "-A"])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to stage all: {}", e))?;
+    let use_wsl = is_wsl_path(&cwd);
+
+    let output = if use_wsl {
+        wsl_git_command(&["add", "-A"], &cwd)
+            .map_err(|e| format!("Failed to stage all: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["add", "-A"])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to stage all: {}", e))?
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -1150,11 +1217,18 @@ async fn git_stage_all(cwd: String) -> Result<(), String> {
 /// Unstage a file
 #[tauri::command]
 async fn git_unstage(cwd: String, path: String) -> Result<(), String> {
-    let output = silent_command("git")
-        .args(["reset", "HEAD", &path])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to unstage: {}", e))?;
+    let use_wsl = is_wsl_path(&cwd);
+
+    let output = if use_wsl {
+        wsl_git_command(&["reset", "HEAD", &path], &cwd)
+            .map_err(|e| format!("Failed to unstage: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["reset", "HEAD", &path])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to unstage: {}", e))?
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -1167,11 +1241,21 @@ async fn git_unstage(cwd: String, path: String) -> Result<(), String> {
 /// Commit staged changes
 #[tauri::command]
 async fn git_commit(cwd: String, message: String) -> Result<String, String> {
-    let output = silent_command("git")
-        .args(["commit", "-m", &message])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to commit: {}", e))?;
+    let use_wsl = is_wsl_path(&cwd);
+
+    // Escape single quotes in message for shell command
+    let escaped_message = message.replace('\'', "'\\''");
+
+    let output = if use_wsl {
+        wsl_git_command(&["commit", "-m", &format!("'{}'", escaped_message)], &cwd)
+            .map_err(|e| format!("Failed to commit: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["commit", "-m", &message])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to commit: {}", e))?
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -1179,13 +1263,17 @@ async fn git_commit(cwd: String, message: String) -> Result<String, String> {
     }
 
     // Get the commit hash
-    let hash_output = silent_command("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .current_dir(&cwd)
-        .output();
+    let hash_output = if use_wsl {
+        wsl_git_command(&["rev-parse", "--short", "HEAD"], &cwd).ok()
+    } else {
+        silent_command("git")
+            .args(["rev-parse", "--short", "HEAD"])
+            .current_dir(&cwd)
+            .output()
+            .ok()
+    };
 
     let hash = hash_output
-        .ok()
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_default();
@@ -1196,11 +1284,18 @@ async fn git_commit(cwd: String, message: String) -> Result<String, String> {
 /// Checkout a branch
 #[tauri::command]
 async fn git_checkout(cwd: String, branch: String) -> Result<(), String> {
-    let output = silent_command("git")
-        .args(["checkout", &branch])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to checkout: {}", e))?;
+    let use_wsl = is_wsl_path(&cwd);
+
+    let output = if use_wsl {
+        wsl_git_command(&["checkout", &branch], &cwd)
+            .map_err(|e| format!("Failed to checkout: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["checkout", &branch])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to checkout: {}", e))?
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -1213,11 +1308,18 @@ async fn git_checkout(cwd: String, branch: String) -> Result<(), String> {
 /// Discard changes to a file
 #[tauri::command]
 async fn git_discard(cwd: String, path: String) -> Result<(), String> {
-    let output = silent_command("git")
-        .args(["checkout", "--", &path])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to discard: {}", e))?;
+    let use_wsl = is_wsl_path(&cwd);
+
+    let output = if use_wsl {
+        wsl_git_command(&["checkout", "--", &path], &cwd)
+            .map_err(|e| format!("Failed to discard: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["checkout", "--", &path])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to discard: {}", e))?
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -1230,11 +1332,18 @@ async fn git_discard(cwd: String, path: String) -> Result<(), String> {
 /// Pull from remote
 #[tauri::command]
 async fn git_pull(cwd: String) -> Result<String, String> {
-    let output = silent_command("git")
-        .args(["pull"])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to pull: {}", e))?;
+    let use_wsl = is_wsl_path(&cwd);
+
+    let output = if use_wsl {
+        wsl_git_command(&["pull"], &cwd)
+            .map_err(|e| format!("Failed to pull: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["pull"])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to pull: {}", e))?
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -1248,11 +1357,18 @@ async fn git_pull(cwd: String) -> Result<String, String> {
 /// Push to remote
 #[tauri::command]
 async fn git_push(cwd: String) -> Result<String, String> {
-    let output = silent_command("git")
-        .args(["push"])
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| format!("Failed to push: {}", e))?;
+    let use_wsl = is_wsl_path(&cwd);
+
+    let output = if use_wsl {
+        wsl_git_command(&["push"], &cwd)
+            .map_err(|e| format!("Failed to push: {}", e))?
+    } else {
+        silent_command("git")
+            .args(["push"])
+            .current_dir(&cwd)
+            .output()
+            .map_err(|e| format!("Failed to push: {}", e))?
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

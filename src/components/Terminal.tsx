@@ -20,9 +20,10 @@ interface TerminalProps {
   initialCwd?: string;
   isActive: boolean;
   onCwdChange?: (cwd: string) => void;
+  skipSpawn?: boolean; // Pour les fenêtres détachées qui réutilisent un PTY existant
 }
 
-export function Terminal({ tabId, shell, distro, initialCwd, isActive, onCwdChange }: TerminalProps) {
+export function Terminal({ tabId, shell, distro, initialCwd, isActive, onCwdChange, skipSpawn = false }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -31,7 +32,11 @@ export function Terminal({ tabId, shell, distro, initialCwd, isActive, onCwdChan
   const unlistenRef = useRef<UnlistenFn | null>(null);
   const shellSpawnedRef = useRef(false);
   const resizeTimeoutRef = useRef<number | null>(null);
+  const skipSpawnRef = useRef(skipSpawn);
   const [showSearch, setShowSearch] = useState(false);
+
+  // Keep skipSpawnRef in sync
+  skipSpawnRef.current = skipSpawn;
 
   const { appearance } = useConfigStore();
   const theme = getTheme(appearance.theme);
@@ -183,9 +188,21 @@ export function Terminal({ tabId, shell, distro, initialCwd, isActive, onCwdChan
     };
     setupListener();
 
-    // Spawn the shell
+    // Spawn the shell (sauf si skipSpawn pour fenêtre détachée)
     const spawnShell = async () => {
-      if (shellSpawnedRef.current) return;
+      if (shellSpawnedRef.current || skipSpawn) {
+        // Pour skipSpawn, on fait quand même un resize initial
+        if (skipSpawn) {
+          setTimeout(() => {
+            fitAddon.fit();
+            const dims = fitAddon.proposeDimensions();
+            if (dims) {
+              resizePty(dims.cols, dims.rows);
+            }
+          }, 100);
+        }
+        return;
+      }
       shellSpawnedRef.current = true;
 
       try {
@@ -247,7 +264,10 @@ export function Terminal({ tabId, shell, distro, initialCwd, isActive, onCwdChan
         unlistenRef.current();
       }
       cleanupNotification();
-      invoke("kill_shell", { tabId }).catch(console.error);
+      // Don't kill the shell if this terminal is reusing an existing PTY (detached window)
+      if (!skipSpawnRef.current) {
+        invoke("kill_shell", { tabId }).catch(console.error);
+      }
       xterm.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
