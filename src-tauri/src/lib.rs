@@ -123,10 +123,11 @@ async fn spawn_shell(
 ) -> Result<(), String> {
     let pty_system = native_pty_system();
 
+    // Use a larger initial size - small sizes can cause issues with complex prompts like p10k
     let pair = pty_system
         .openpty(PtySize {
-            rows: 24,
-            cols: 80,
+            rows: 40,
+            cols: 120,
             pixel_width: 0,
             pixel_height: 0,
         })
