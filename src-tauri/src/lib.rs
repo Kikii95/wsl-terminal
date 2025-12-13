@@ -1161,7 +1161,9 @@ async fn git_branches(cwd: String) -> Result<Vec<GitBranch>, String> {
         }
 
         let current = line.starts_with('*');
-        let parts: Vec<&str> = line[2..].split_whitespace().collect();
+        // Trim leading '*' and whitespace before parsing
+        let line_content = line.trim_start_matches(|c: char| c == '*' || c.is_whitespace());
+        let parts: Vec<&str> = line_content.split_whitespace().collect();
 
         if let Some(name) = parts.first() {
             // Skip remotes/origin/HEAD
