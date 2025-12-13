@@ -143,15 +143,15 @@ async fn spawn_shell(
             if let Some(d) = &distro {
                 c.args(["-d", d]);
             }
-            // Set proper TERM for color support and complex prompts like p10k
-            c.env("TERM", "xterm-256color");
-            c.env("COLORTERM", "truecolor");
-            // Use initial_cwd if provided, otherwise home directory
-            if let Some(ref cwd) = initial_cwd {
-                c.args(["--cd", cwd]);
-            } else {
-                c.args(["--cd", "~"]);
-            }
+            // CRITICAL: c.env() only sets env vars for wsl.exe (Windows side), NOT for the Linux shell!
+            // We must use a bash wrapper to set TERM/COLORTERM inside Linux before launching the user's shell.
+            // This is essential for complex prompts like powerlevel10k that check COLORTERM for truecolor support.
+            let cwd_path = initial_cwd.as_deref().unwrap_or("~");
+            let wrapper_cmd = format!(
+                "export TERM=xterm-256color; export COLORTERM=truecolor; cd '{}'; exec $SHELL -l",
+                bash_escape(cwd_path)
+            );
+            c.args(["-e", "bash", "-c", &wrapper_cmd]);
             c
         }
         "powershell" => {
@@ -176,17 +176,17 @@ async fn spawn_shell(
             c
         }
         _ => {
+            // Default to WSL with same wrapper approach
             let mut c = CommandBuilder::new("wsl.exe");
             if let Some(d) = &distro {
                 c.args(["-d", d]);
             }
-            c.env("TERM", "xterm-256color");
-            c.env("COLORTERM", "truecolor");
-            if let Some(ref cwd) = initial_cwd {
-                c.args(["--cd", cwd]);
-            } else {
-                c.args(["--cd", "~"]);
-            }
+            let cwd_path = initial_cwd.as_deref().unwrap_or("~");
+            let wrapper_cmd = format!(
+                "export TERM=xterm-256color; export COLORTERM=truecolor; cd '{}'; exec $SHELL -l",
+                bash_escape(cwd_path)
+            );
+            c.args(["-e", "bash", "-c", &wrapper_cmd]);
             c
         }
     };
