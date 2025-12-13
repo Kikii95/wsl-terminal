@@ -288,11 +288,31 @@ export function DockerPanel({ isOpen, onClose }: DockerPanelProps) {
           {error && (
             <div className="p-4">
               <div
-                className="flex items-start gap-2 p-3 rounded-lg overflow-hidden"
+                className="flex flex-col gap-2 p-3 rounded-lg"
                 style={{ backgroundColor: `${theme.red}20`, color: theme.red }}
               >
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span className="text-sm break-words whitespace-pre-wrap overflow-hidden" style={{ wordBreak: "break-word" }}>{error}</span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0 flex-1">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span className="text-sm break-words overflow-hidden" style={{ wordBreak: "break-word" }}>
+                      {error.length > 150 ? error.slice(0, 150) + "..." : error}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setError(null)}
+                    className="shrink-0 p-1 rounded hover:bg-secondary/30 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {error.length > 150 && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer hover:opacity-80">Show full error</summary>
+                    <pre className="mt-2 p-2 rounded text-xs overflow-x-auto max-h-32 overflow-y-auto" style={{ backgroundColor: `${theme.ui.background}80` }}>
+                      {error}
+                    </pre>
+                  </details>
+                )}
               </div>
             </div>
           )}
@@ -328,11 +348,14 @@ export function DockerPanel({ isOpen, onClose }: DockerPanelProps) {
                         No containers found
                       </p>
                     )}
-                    {containers.map((container) => (
+                    {containers.map((container, index) => (
                       <div
                         key={container.id}
                         className="p-3 rounded-lg"
-                        style={{ backgroundColor: theme.ui.background }}
+                        style={{
+                          backgroundColor: theme.ui.background,
+                          borderTop: index > 0 ? `1px solid ${theme.ui.border}` : "none",
+                        }}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -442,10 +465,13 @@ export function DockerPanel({ isOpen, onClose }: DockerPanelProps) {
                         No images found
                       </p>
                     )}
-                    {images.map((image) => (
+                    {images.map((image, index) => (
                       <div
                         key={image.id}
                         className="flex items-center justify-between p-2 rounded hover:bg-secondary/30"
+                        style={{
+                          borderTop: index > 0 ? `1px solid ${theme.ui.border}30` : "none",
+                        }}
                       >
                         <div className="min-w-0">
                           <div className="text-xs font-medium truncate" style={{ color: theme.ui.text }}>
@@ -487,10 +513,13 @@ export function DockerPanel({ isOpen, onClose }: DockerPanelProps) {
                         No volumes found
                       </p>
                     )}
-                    {volumes.map((volume) => (
+                    {volumes.map((volume, index) => (
                       <div
                         key={volume.name}
                         className="p-2 rounded hover:bg-secondary/30"
+                        style={{
+                          borderTop: index > 0 ? `1px solid ${theme.ui.border}30` : "none",
+                        }}
                       >
                         <div className="text-xs font-medium truncate" style={{ color: theme.ui.text }}>
                           {volume.name}

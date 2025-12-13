@@ -131,10 +131,20 @@ export function initWindowListeners() {
     // Re-add the tab to the main terminal store
     if (detachedWindow?.tab) {
       // Import dynamically to avoid circular dependency
-      import("./terminalStore").then(({ useTerminalStore }) => {
+      Promise.all([
+        import("./terminalStore"),
+        import("./paneStore"),
+      ]).then(([{ useTerminalStore }, { usePaneStore }]) => {
         const terminalStore = useTerminalStore.getState();
+        const paneStore = usePaneStore.getState();
+        const tab = detachedWindow.tab;
+
         // The tab already exists with its PTY process running, just add it back to the store
-        terminalStore.restoreTab(detachedWindow.tab);
+        terminalStore.restoreTab(tab);
+
+        // Also restore the pane with skipSpawn: true so it doesn't create a new shell
+        // Use tab.id as the paneId since that's what the Terminal component expects
+        paneStore.restoreTabPane(tab.id, tab.id, tab.shell, tab.distro, tab.cwd);
       });
     }
   });

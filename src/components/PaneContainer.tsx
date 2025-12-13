@@ -48,6 +48,7 @@ export function PaneContainer({ tabId, node, isTabActive }: PaneContainerProps) 
           initialCwd={node.cwd}
           isActive={isActive}
           onCwdChange={handleCwdChange}
+          skipSpawn={node.skipSpawn}
         />
       </div>
     );

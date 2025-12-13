@@ -319,11 +319,16 @@ export function GitPanel({ isOpen, onClose, cwd }: GitPanelProps) {
           {error && (
             <div className="p-4">
               <div
-                className="flex items-center gap-2 p-3 rounded-lg"
+                className="flex flex-col gap-1 p-3 rounded-lg"
                 style={{ backgroundColor: `${theme.red}20`, color: theme.red }}
               >
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span className="text-sm">{error}</span>
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span className="text-sm">{error}</span>
+                </div>
+                {cwd && (
+                  <span className="text-xs opacity-75 ml-6">Path: {cwd}</span>
+                )}
               </div>
             </div>
           )}

@@ -17,6 +17,7 @@ export interface PaneNode {
   shell?: string;
   distro?: string;
   cwd?: string;
+  skipSpawn?: boolean; // For re-attaching windows that already have a PTY
   // For split type
   direction?: SplitDirection;
   children?: PaneNode[];

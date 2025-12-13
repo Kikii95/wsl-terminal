@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { MouseEvent } from "react";
-import { X, Minimize2, Maximize2, Pin, PinOff, CornerDownLeft } from "lucide-react";
+import { X, Minus, Square, Copy, Pin, PinOff, CornerDownLeft } from "lucide-react";
 import { Terminal } from "./Terminal";
 import { useTheme } from "@/App";
 import type { Tab } from "@/types/terminal";
@@ -152,17 +152,17 @@ export function DetachedWindow({ tab, windowId }: DetachedWindowProps) {
             style={{ color: theme.ui.textMuted }}
             title="Minimize"
           >
-            <Minimize2 className="w-4 h-4" />
+            <Minus className="w-4 h-4" />
           </button>
 
-          {/* Maximize */}
+          {/* Maximize/Restore */}
           <button
             onClick={handleMaximize}
             className="w-7 h-7 flex items-center justify-center rounded hover:bg-secondary/50 transition-colors"
             style={{ color: theme.ui.textMuted }}
             title={isMaximized ? "Restore" : "Maximize"}
           >
-            <Maximize2 className="w-4 h-4" />
+            {isMaximized ? <Copy className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
           </button>
 
           {/* Close */}

@@ -6,6 +6,7 @@ interface PaneState {
 
   // Actions
   initTabPane: (tabId: string, shell: string, distro?: string, cwd?: string) => string;
+  restoreTabPane: (tabId: string, paneId: string, shell: string, distro?: string, cwd?: string) => void;
   splitPane: (tabId: string, paneId: string, direction: SplitDirection, shell: string, distro?: string) => void;
   closePane: (tabId: string, paneId: string) => boolean; // returns true if tab should be closed
   setActivePane: (tabId: string, paneId: string) => void;
@@ -100,6 +101,29 @@ export const usePaneStore = create<PaneState>((set, get) => ({
     }));
 
     return paneId;
+  },
+
+  // Restore a tab pane with skipSpawn for re-attaching detached windows
+  restoreTabPane: (tabId: string, paneId: string, shell: string, distro?: string, cwd?: string) => {
+    const root: PaneNode = {
+      id: paneId,
+      type: "terminal",
+      shell,
+      distro,
+      cwd,
+      skipSpawn: true, // Don't spawn a new shell - PTY already exists
+    };
+
+    set(state => ({
+      panes: {
+        ...state.panes,
+        [tabId]: {
+          tabId,
+          root,
+          activePaneId: paneId,
+        },
+      },
+    }));
   },
 
   splitPane: (tabId: string, paneId: string, direction: SplitDirection, shell: string, distro?: string) => {
