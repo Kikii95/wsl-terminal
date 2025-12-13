@@ -220,6 +220,10 @@ export function Terminal({ tabId, shell, distro, initialCwd, isActive, onCwdChan
       shellSpawnedRef.current = true;
 
       try {
+        // Fit first to get actual terminal dimensions BEFORE spawning
+        // This is critical for complex prompts like p10k that need correct size immediately
+        fitAddon.fit();
+
         await invoke("spawn_shell", {
           tabId,
           shell,
@@ -227,21 +231,28 @@ export function Terminal({ tabId, shell, distro, initialCwd, isActive, onCwdChan
           initialCwd: initialCwd || null,
         });
 
-        // Resize after spawn
+        // Send resize immediately after spawn with actual dimensions
+        const dims = fitAddon.proposeDimensions();
+        if (dims) {
+          await resizePty(dims.cols, dims.rows);
+        }
+
+        // Additional resize after a short delay to handle any layout adjustments
         setTimeout(() => {
           fitAddon.fit();
-          const dims = fitAddon.proposeDimensions();
-          if (dims) {
-            resizePty(dims.cols, dims.rows);
+          const lateDims = fitAddon.proposeDimensions();
+          if (lateDims) {
+            resizePty(lateDims.cols, lateDims.rows);
           }
-        }, 100);
+        }, 200);
       } catch (error) {
         console.error("Failed to spawn shell:", error);
         xterm.writeln(`\x1b[31mFailed to spawn shell: ${error}\x1b[0m`);
         xterm.writeln("\x1b[33mMake sure WSL is installed and configured.\x1b[0m");
       }
     };
-    spawnShell();
+    // Small delay before spawn to ensure terminal container is fully rendered
+    setTimeout(spawnShell, 50);
 
     // Handle window resize with debounce
     const handleResize = () => {

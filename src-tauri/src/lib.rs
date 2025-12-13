@@ -143,6 +143,9 @@ async fn spawn_shell(
             if let Some(d) = &distro {
                 c.args(["-d", d]);
             }
+            // Set proper TERM for color support and complex prompts like p10k
+            c.env("TERM", "xterm-256color");
+            c.env("COLORTERM", "truecolor");
             // Use initial_cwd if provided, otherwise home directory
             if let Some(ref cwd) = initial_cwd {
                 c.args(["--cd", cwd]);
@@ -154,6 +157,7 @@ async fn spawn_shell(
         "powershell" => {
             let mut c = CommandBuilder::new("powershell.exe");
             c.args(["-NoLogo", "-NoExit"]);
+            c.env("TERM", "xterm-256color");
             if let Some(ref cwd) = initial_cwd {
                 c.cwd(cwd);
             } else {
@@ -163,6 +167,7 @@ async fn spawn_shell(
         }
         "cmd" => {
             let mut c = CommandBuilder::new("cmd.exe");
+            c.env("TERM", "xterm-256color");
             if let Some(ref cwd) = initial_cwd {
                 c.cwd(cwd);
             } else {
@@ -175,6 +180,8 @@ async fn spawn_shell(
             if let Some(d) = &distro {
                 c.args(["-d", d]);
             }
+            c.env("TERM", "xterm-256color");
+            c.env("COLORTERM", "truecolor");
             if let Some(ref cwd) = initial_cwd {
                 c.args(["--cd", cwd]);
             } else {
