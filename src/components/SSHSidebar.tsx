@@ -120,19 +120,6 @@ export function SSHSidebar({ isOpen, onClose }: SSHSidebarProps) {
 
   return (
     <>
-      {/* Overlay backdrop for click-outside */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-30"
-            onClick={onClose}
-          />
-        )}
-      </AnimatePresence>
-
       {/* Sidebar */}
       <AnimatePresence>
         {isOpen && (
@@ -148,7 +135,6 @@ export function SSHSidebar({ isOpen, onClose }: SSHSidebarProps) {
               borderTop: `1px solid ${theme.ui.border}`,
               borderBottom: `1px solid ${theme.ui.border}`,
             }}
-            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div
@@ -347,7 +333,7 @@ export function SSHSidebar({ isOpen, onClose }: SSHSidebarProps) {
               className="px-5 py-3 text-[10px] border-t"
               style={{ borderColor: theme.ui.border, color: theme.ui.textMuted }}
             >
-              Click outside or press Esc to close
+              Press Esc or click X to close
             </div>
 
             {/* Password Form Modal */}

@@ -45,8 +45,13 @@ struct PtyProcess {
     _pair: portable_pty::PtyPair,
 }
 
+// Maximum buffer size per terminal (100KB)
+const MAX_BUFFER_SIZE: usize = 100 * 1024;
+
 struct AppState {
     processes: Arc<Mutex<HashMap<String, PtyProcess>>>,
+    // Store output buffers per tab for detach/reattach
+    output_buffers: Arc<std::sync::Mutex<HashMap<String, Vec<u8>>>>,
 }
 
 #[tauri::command]
@@ -194,9 +199,16 @@ async fn spawn_shell(
         );
     }
 
+    // Initialize buffer for this tab
+    {
+        let mut buffers = state.output_buffers.lock().unwrap();
+        buffers.insert(tab_id.clone(), Vec::with_capacity(MAX_BUFFER_SIZE));
+    }
+
     // Read output in background thread
     let tab_id_clone = tab_id.clone();
     let window_clone = window.clone();
+    let buffers_clone = state.output_buffers.clone();
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
         loop {
@@ -205,6 +217,18 @@ async fn spawn_shell(
                 Ok(n) => {
                     let data = String::from_utf8_lossy(&buf[..n]).to_string();
                     let _ = window_clone.emit(&format!("shell-output-{}", tab_id_clone), &data);
+
+                    // Also store in buffer for detach/reattach
+                    if let Ok(mut buffers) = buffers_clone.lock() {
+                        if let Some(buffer) = buffers.get_mut(&tab_id_clone) {
+                            buffer.extend_from_slice(&buf[..n]);
+                            // Trim to max size (keep most recent data)
+                            if buffer.len() > MAX_BUFFER_SIZE {
+                                let excess = buffer.len() - MAX_BUFFER_SIZE;
+                                buffer.drain(0..excess);
+                            }
+                        }
+                    }
                 }
                 Err(_) => break,
             }
@@ -261,7 +285,24 @@ async fn resize_pty(
 async fn kill_shell(tab_id: String, state: tauri::State<'_, AppState>) -> Result<(), String> {
     let mut processes = state.processes.lock().await;
     processes.remove(&tab_id);
+    // Also clean up buffer
+    if let Ok(mut buffers) = state.output_buffers.lock() {
+        buffers.remove(&tab_id);
+    }
     Ok(())
+}
+
+/// Get the output buffer for a shell (for detach/reattach)
+#[tauri::command]
+async fn get_shell_buffer(tab_id: String, state: tauri::State<'_, AppState>) -> Result<String, String> {
+    let buffers = state.output_buffers.lock()
+        .map_err(|e| format!("Failed to lock buffers: {}", e))?;
+
+    if let Some(buffer) = buffers.get(&tab_id) {
+        Ok(String::from_utf8_lossy(buffer).to_string())
+    } else {
+        Ok(String::new())
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -1093,7 +1134,8 @@ async fn git_branches(cwd: String) -> Result<Vec<GitBranch>, String> {
     };
 
     if !output.status.success() {
-        return Err("Failed to list branches".to_string());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to list branches: {}", stderr.trim()));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -1144,7 +1186,8 @@ async fn git_log(cwd: String, count: Option<u32>) -> Result<Vec<GitCommit>, Stri
     };
 
     if !output.status.success() {
-        return Err("Failed to get log".to_string());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to get log: {}", stderr.trim()));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -1791,6 +1834,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(AppState {
             processes: Arc::new(Mutex::new(HashMap::new())),
+            output_buffers: Arc::new(std::sync::Mutex::new(HashMap::new())),
         })
         .manage(IpcState {
             response_tx: ipc_state.response_tx.clone(),
@@ -1800,6 +1844,7 @@ pub fn run() {
             write_to_shell,
             resize_pty,
             kill_shell,
+            get_shell_buffer,
             get_wsl_distros,
             get_git_info,
             get_docker_status,

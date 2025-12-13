@@ -65,6 +65,8 @@ export function GitPanel({ isOpen, onClose, cwd }: GitPanelProps) {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [branchesError, setBranchesError] = useState<string | null>(null);
+  const [commitsError, setCommitsError] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState({
     staged: true,
     unstaged: true,
@@ -94,20 +96,24 @@ export function GitPanel({ isOpen, onClose, cwd }: GitPanelProps) {
   const fetchBranches = async () => {
     if (!cwd) return;
     try {
+      setBranchesError(null);
       const result = await invoke<GitBranchInfo[]>("git_branches", { cwd });
       setBranches(result);
     } catch (e) {
       console.error("Failed to fetch branches:", e);
+      setBranchesError(String(e));
     }
   };
 
   const fetchRecentCommits = async () => {
     if (!cwd) return;
     try {
+      setCommitsError(null);
       const result = await invoke<GitCommit[]>("git_log", { cwd, count: 10 });
       setRecentCommits(result);
     } catch (e) {
       console.error("Failed to fetch commits:", e);
+      setCommitsError(String(e));
     }
   };
 
@@ -613,37 +619,47 @@ export function GitPanel({ isOpen, onClose, cwd }: GitPanelProps) {
                 </button>
                 {expandedSections.branches && (
                   <div className="space-y-1 ml-6">
-                    {branches
-                      .filter((b) => !b.name.startsWith("remotes/"))
-                      .map((branch) => (
-                        <button
-                          key={branch.name}
-                          onClick={() => !branch.current && checkoutBranch(branch.name)}
-                          disabled={branch.current || actionLoading === branch.name}
-                          className={cn(
-                            "flex items-center gap-2 w-full p-1.5 rounded text-left transition-colors",
-                            branch.current
-                              ? "bg-accent/20"
-                              : "hover:bg-secondary/30"
-                          )}
-                        >
-                          {actionLoading === branch.name ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <span
-                              className="text-xs"
-                              style={{
-                                color: branch.current ? theme.ui.accent : theme.ui.text,
-                              }}
-                            >
-                              {branch.name}
-                            </span>
-                          )}
-                          {branch.current && (
-                            <Check className="w-3 h-3 ml-auto" style={{ color: theme.ui.accent }} />
-                          )}
-                        </button>
-                      ))}
+                    {branchesError ? (
+                      <p className="text-xs p-2 rounded" style={{ backgroundColor: `${theme.red}20`, color: theme.red }}>
+                        {branchesError}
+                      </p>
+                    ) : branches.length === 0 ? (
+                      <p className="text-xs text-center py-4" style={{ color: theme.ui.textMuted }}>
+                        No branches found
+                      </p>
+                    ) : (
+                      branches
+                        .filter((b) => !b.name.startsWith("remotes/"))
+                        .map((branch) => (
+                          <button
+                            key={branch.name}
+                            onClick={() => !branch.current && checkoutBranch(branch.name)}
+                            disabled={branch.current || actionLoading === branch.name}
+                            className={cn(
+                              "flex items-center gap-2 w-full p-1.5 rounded text-left transition-colors",
+                              branch.current
+                                ? "bg-accent/20"
+                                : "hover:bg-secondary/30"
+                            )}
+                          >
+                            {actionLoading === branch.name ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <span
+                                className="text-xs"
+                                style={{
+                                  color: branch.current ? theme.ui.accent : theme.ui.text,
+                                }}
+                              >
+                                {branch.name}
+                              </span>
+                            )}
+                            {branch.current && (
+                              <Check className="w-3 h-3 ml-auto" style={{ color: theme.ui.accent }} />
+                            )}
+                          </button>
+                        ))
+                    )}
                   </div>
                 )}
               </div>
@@ -666,7 +682,11 @@ export function GitPanel({ isOpen, onClose, cwd }: GitPanelProps) {
                 </button>
                 {expandedSections.history && (
                   <div className="space-y-2 ml-6">
-                    {recentCommits.length === 0 ? (
+                    {commitsError ? (
+                      <p className="text-xs p-2 rounded" style={{ backgroundColor: `${theme.red}20`, color: theme.red }}>
+                        {commitsError}
+                      </p>
+                    ) : recentCommits.length === 0 ? (
                       <p className="text-xs text-center py-4" style={{ color: theme.ui.textMuted }}>
                         No commits yet
                       </p>

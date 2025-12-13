@@ -190,9 +190,20 @@ export function Terminal({ tabId, shell, distro, initialCwd, isActive, onCwdChan
 
     // Spawn the shell (sauf si skipSpawn pour fenêtre détachée)
     const spawnShell = async () => {
-      if (shellSpawnedRef.current || skipSpawn) {
-        // Pour skipSpawn, on fait quand même un resize initial
-        if (skipSpawn) {
+      if (shellSpawnedRef.current) {
+        return;
+      }
+
+      // For skipSpawn (re-attached window), restore buffer instead of spawning
+      if (skipSpawn) {
+        shellSpawnedRef.current = true;
+        try {
+          // Fetch the stored buffer from backend
+          const buffer = await invoke<string>("get_shell_buffer", { tabId });
+          if (buffer && buffer.length > 0) {
+            xterm.write(buffer);
+          }
+          // Resize after buffer restore
           setTimeout(() => {
             fitAddon.fit();
             const dims = fitAddon.proposeDimensions();
@@ -200,9 +211,12 @@ export function Terminal({ tabId, shell, distro, initialCwd, isActive, onCwdChan
               resizePty(dims.cols, dims.rows);
             }
           }, 100);
+        } catch (error) {
+          console.error("Failed to restore shell buffer:", error);
         }
         return;
       }
+
       shellSpawnedRef.current = true;
 
       try {

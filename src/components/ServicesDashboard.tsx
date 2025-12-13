@@ -307,7 +307,6 @@ export function ServicesDashboard({ isOpen, onClose }: ServicesDashboardProps) {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
