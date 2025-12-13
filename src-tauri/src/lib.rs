@@ -218,7 +218,8 @@ async fn spawn_shell(
 
     // Read output in background thread
     let tab_id_clone = tab_id.clone();
-    let window_clone = window.clone();
+    // Use app_handle instead of window to emit to all windows (including detached ones)
+    let app_handle = window.app_handle().clone();
     let buffers_clone = state.output_buffers.clone();
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
@@ -227,7 +228,8 @@ async fn spawn_shell(
                 Ok(0) => break,
                 Ok(n) => {
                     let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                    let _ = window_clone.emit(&format!("shell-output-{}", tab_id_clone), &data);
+                    // Emit to all windows so detached windows also receive the output
+                    let _ = app_handle.emit(&format!("shell-output-{}", tab_id_clone), &data);
 
                     // Also store in buffer for detach/reattach
                     if let Ok(mut buffers) = buffers_clone.lock() {
