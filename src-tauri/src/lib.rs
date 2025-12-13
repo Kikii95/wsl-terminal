@@ -468,6 +468,133 @@ async fn list_projects(root_path: String, categories: Vec<String>) -> Result<Vec
     Ok(projects)
 }
 
+// Service management for Phase 2
+#[derive(serde::Serialize)]
+struct ProcessStats {
+    cpu: f64,
+    memory: u64,
+}
+
+#[tauri::command]
+async fn start_service(command: String, cwd: Option<String>) -> Result<u32, String> {
+    use std::process::{Command, Stdio};
+
+    let parts: Vec<&str> = command.split_whitespace().collect();
+    if parts.is_empty() {
+        return Err("Empty command".to_string());
+    }
+
+    let program = parts[0];
+    let args = &parts[1..];
+
+    let mut cmd = Command::new(program);
+    cmd.args(args)
+       .stdin(Stdio::null())
+       .stdout(Stdio::piped())
+       .stderr(Stdio::piped());
+
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    if let Some(ref dir) = cwd {
+        // Expand ~ to home
+        let expanded = if dir.starts_with("~/") || dir == "~" {
+            let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_default();
+            dir.replacen("~", &home, 1)
+        } else {
+            dir.clone()
+        };
+        cmd.current_dir(expanded);
+    }
+
+    let child = cmd.spawn().map_err(|e| format!("Failed to start service: {}", e))?;
+    let pid = child.id();
+
+    Ok(pid)
+}
+
+#[tauri::command]
+async fn stop_service(pid: u32) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/F", "/T"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| format!("Failed to kill process: {}", e))?;
+    }
+
+    #[cfg(not(windows))]
+    {
+        use std::process::Command;
+        // Try SIGTERM first, then SIGKILL
+        let _ = Command::new("kill")
+            .args(["-15", &pid.to_string()])
+            .output();
+
+        // Wait a bit then force kill if still running
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        let _ = Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .output();
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_process_stats(pid: u32) -> Result<ProcessStats, String> {
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+
+        // Get CPU and memory using wmic
+        let output = Command::new("wmic")
+            .args(["process", "where", &format!("ProcessId={}", pid), "get", "WorkingSetSize,PercentProcessorTime", "/format:csv"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| format!("Failed to get stats: {}", e))?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let lines: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
+
+        if lines.len() >= 2 {
+            let parts: Vec<&str> = lines[1].split(',').collect();
+            if parts.len() >= 3 {
+                let cpu = parts[1].trim().parse::<f64>().unwrap_or(0.0);
+                let memory = parts[2].trim().parse::<u64>().unwrap_or(0);
+                return Ok(ProcessStats { cpu, memory });
+            }
+        }
+
+        Ok(ProcessStats { cpu: 0.0, memory: 0 })
+    }
+
+    #[cfg(not(windows))]
+    {
+        use std::process::Command;
+
+        // Get stats from /proc on Linux
+        let stat_output = Command::new("ps")
+            .args(["-p", &pid.to_string(), "-o", "%cpu,rss", "--no-headers"])
+            .output()
+            .map_err(|e| format!("Failed to get stats: {}", e))?;
+
+        let stdout = String::from_utf8_lossy(&stat_output.stdout);
+        let parts: Vec<&str> = stdout.trim().split_whitespace().collect();
+
+        if parts.len() >= 2 {
+            let cpu = parts[0].parse::<f64>().unwrap_or(0.0);
+            let memory = parts[1].parse::<u64>().unwrap_or(0) * 1024; // Convert KB to bytes
+            Ok(ProcessStats { cpu, memory })
+        } else {
+            Err("Process not found".to_string())
+        }
+    }
+}
+
 #[tauri::command]
 async fn toggle_quake_mode(window: tauri::Window) -> Result<(), String> {
     if window.is_visible().map_err(|e| e.to_string())? {
@@ -712,7 +839,10 @@ pub fn run() {
             list_projects,
             toggle_quake_mode,
             set_quake_position,
-            ipc_response
+            ipc_response,
+            start_service,
+            stop_service,
+            get_process_stats
         ])
         .setup(move |app| {
             if cfg!(debug_assertions) {

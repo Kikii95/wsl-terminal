@@ -11,6 +11,7 @@ import { ProjectSwitcher } from "@/components/ProjectSwitcher";
 import { SSHSidebar } from "@/components/SSHSidebar";
 import { ToastContainer } from "@/components/ToastContainer";
 import { WorkspaceManager } from "@/components/WorkspaceManager";
+import { ServicesDashboard } from "@/components/ServicesDashboard";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useConfigStore } from "@/stores/configStore";
 import { usePaneStore } from "@/stores/paneStore";
@@ -40,6 +41,7 @@ function App() {
   const [showProjectSwitcher, setShowProjectSwitcher] = useState(false);
   const [showSSHSidebar, setShowSSHSidebar] = useState(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
+  const [showServicesDashboard, setShowServicesDashboard] = useState(false);
 
   // Initialize quake mode
   useQuakeMode();
@@ -194,6 +196,12 @@ function App() {
       if (e.ctrlKey && e.shiftKey && e.key === "L") {
         e.preventDefault();
         setShowWorkspaceManager(true);
+      }
+
+      // Ctrl+Shift+S: Services Dashboard
+      if (e.ctrlKey && e.shiftKey && e.key === "S") {
+        e.preventDefault();
+        setShowServicesDashboard(true);
       }
     };
 
@@ -363,6 +371,12 @@ function App() {
         <WorkspaceManager
           isOpen={showWorkspaceManager}
           onClose={() => setShowWorkspaceManager(false)}
+        />
+
+        {/* Services Dashboard */}
+        <ServicesDashboard
+          isOpen={showServicesDashboard}
+          onClose={() => setShowServicesDashboard(false)}
         />
 
         {/* Toast Notifications */}

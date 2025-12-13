@@ -77,10 +77,11 @@ if (storedVersion !== APP_VERSION) {
   localStorage.setItem("wsl-terminal-version", APP_VERSION);
 }
 
+// Note: StrictMode disabled due to double-mount issues with PTY spawning
+// StrictMode causes shell to spawn twice, resulting in duplicate prompts
+// This is a known limitation when dealing with external processes
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
 );
