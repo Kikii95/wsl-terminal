@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { Plus, X, Settings, Terminal, Cpu, Hash, ChevronDown } from "lucide-react";
+import { Plus, X, Settings, Terminal, Cpu, Hash, ChevronDown, ExternalLink } from "lucide-react";
 import { useTerminalStore } from "@/stores/terminalStore";
+import { useWindowStore } from "@/stores/windowStore";
+import { useToastStore } from "@/stores/toastStore";
 import { SettingsModal } from "./SettingsModal";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +38,9 @@ export function TabBar() {
     setWslDistros,
     setTabs,
   } = useTerminalStore();
+
+  const { detachTab } = useWindowStore();
+  const { addToast } = useToastStore();
 
   const [showNewTabMenu, setShowNewTabMenu] = useState(false);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
@@ -79,6 +84,20 @@ export function TabBar() {
   const handleContextMenu = (e: React.MouseEvent, tabId: string) => {
     e.preventDefault();
     setContextMenu({ tabId, x: e.clientX, y: e.clientY });
+  };
+
+  const handleDetachTab = async (tabId: string) => {
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab) return;
+
+    try {
+      await detachTab(tab);
+      removeTab(tabId);
+      addToast(`Tab "${tab.title}" detached to new window`, "success");
+    } catch (error) {
+      addToast("Failed to detach tab", "error");
+    }
+    setContextMenu(null);
   };
 
   return (
@@ -312,6 +331,14 @@ export function TabBar() {
                 />
               ))}
             </div>
+            <div className="my-1 border-t border-border" />
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors"
+              onClick={() => handleDetachTab(contextMenu.tabId)}
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>Detach to Window</span>
+            </button>
             <div className="my-1 border-t border-border" />
             <button
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"

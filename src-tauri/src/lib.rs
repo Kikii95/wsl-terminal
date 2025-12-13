@@ -799,6 +799,111 @@ async fn has_ssh_credential(connection_id: String) -> Result<bool, String> {
     }
 }
 
+// ============================================================================
+// Multi-Window Support (Phase 4)
+// ============================================================================
+
+/// Create a new window for a detached tab
+#[tauri::command]
+async fn create_detached_window(
+    app_handle: tauri::AppHandle,
+    tab_id: String,
+    title: String,
+    shell: String,
+    distro: Option<String>,
+) -> Result<String, String> {
+    use tauri::WebviewWindowBuilder;
+    use tauri::WebviewUrl;
+
+    let window_id = format!("detached-{}", &tab_id[..8]);
+
+    let window = WebviewWindowBuilder::new(
+        &app_handle,
+        &window_id,
+        WebviewUrl::App("index.html".into())
+    )
+    .title(&title)
+    .inner_size(800.0, 500.0)
+    .min_inner_size(400.0, 300.0)
+    .decorations(false)
+    .transparent(true)
+    .shadow(true)
+    .center()
+    .build()
+    .map_err(|e| format!("Failed to create window: {}", e))?;
+
+    // Escape strings for JavaScript
+    let escaped_title = title.replace('\\', "\\\\").replace('\'', "\\'");
+    let distro_js = match &distro {
+        Some(d) => format!("'{}'", d.replace('\\', "\\\\").replace('\'', "\\'")),
+        None => "null".to_string(),
+    };
+
+    // Pass the tab info to the new window
+    let _ = window.eval(&format!(
+        "window.__DETACHED_TAB_ID__ = '{}'; window.__WINDOW_ID__ = '{}'; window.__TAB_TITLE__ = '{}'; window.__TAB_SHELL__ = '{}'; window.__TAB_DISTRO__ = {};",
+        tab_id, window_id, escaped_title, shell, distro_js
+    ));
+
+    Ok(window_id)
+}
+
+/// Close a detached window
+#[tauri::command]
+async fn close_detached_window(
+    app_handle: tauri::AppHandle,
+    window_id: String,
+) -> Result<(), String> {
+    if let Some(window) = app_handle.get_webview_window(&window_id) {
+        window.close().map_err(|e| format!("Failed to close window: {}", e))?;
+    }
+    Ok(())
+}
+
+/// Set always on top for a window
+#[tauri::command]
+async fn set_always_on_top(
+    window: tauri::Window,
+    always_on_top: bool,
+) -> Result<(), String> {
+    window.set_always_on_top(always_on_top)
+        .map_err(|e| format!("Failed to set always on top: {}", e))?;
+    Ok(())
+}
+
+/// Get list of all windows
+#[tauri::command]
+async fn get_all_windows(app_handle: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let windows: Vec<String> = app_handle.webview_windows()
+        .keys()
+        .cloned()
+        .collect();
+    Ok(windows)
+}
+
+/// Attach a detached window back to main (close window, tab goes back to main)
+#[tauri::command]
+async fn attach_window_to_main(
+    app_handle: tauri::AppHandle,
+    window_id: String,
+    tab_id: String,
+) -> Result<(), String> {
+    // Emit event to main window to add the tab back
+    if let Some(main_window) = app_handle.get_webview_window("main") {
+        main_window.emit("attach-tab", serde_json::json!({
+            "tabId": tab_id,
+            "fromWindow": window_id
+        })).map_err(|e| format!("Failed to emit attach event: {}", e))?;
+    }
+
+    // Close the detached window
+    if let Some(window) = app_handle.get_webview_window(&window_id) {
+        window.close().map_err(|e| format!("Failed to close window: {}", e))?;
+    }
+
+    Ok(())
+}
+
 /// IPC response channel for MCP communication
 type IpcResponseTx = Arc<Mutex<Option<tokio::sync::oneshot::Sender<serde_json::Value>>>>;
 
@@ -1024,7 +1129,13 @@ pub fn run() {
             store_ssh_credential,
             get_ssh_credential,
             delete_ssh_credential,
-            has_ssh_credential
+            has_ssh_credential,
+            // Multi-window (Phase 4)
+            create_detached_window,
+            close_detached_window,
+            set_always_on_top,
+            get_all_windows,
+            attach_window_to_main
         ])
         .setup(move |app| {
             if cfg!(debug_assertions) {

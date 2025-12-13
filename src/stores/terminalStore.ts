@@ -16,6 +16,7 @@ interface TerminalState {
   setWslDistros: (distros: string[]) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
   setTabs: (tabs: Tab[]) => void;
+  restoreTab: (tab: Tab) => void;
 }
 
 const generateId = () => crypto.randomUUID();
@@ -139,5 +140,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setTabs: (tabs: Tab[]) => {
     set({ tabs });
+  },
+
+  restoreTab: (tab: Tab) => {
+    set((state) => ({
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id,
+    }));
   },
 }));

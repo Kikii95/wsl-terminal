@@ -1,4 +1,4 @@
-import { useEffect, createContext, useContext, useState } from "react";
+import { useEffect, createContext, useContext, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Terminal as TerminalIcon } from "lucide-react";
 import { TitleBar } from "@/components/TitleBar";
@@ -12,13 +12,27 @@ import { SSHSidebar } from "@/components/SSHSidebar";
 import { ToastContainer } from "@/components/ToastContainer";
 import { WorkspaceManager } from "@/components/WorkspaceManager";
 import { ServicesDashboard } from "@/components/ServicesDashboard";
+import { DetachedWindow } from "@/components/DetachedWindow";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useConfigStore } from "@/stores/configStore";
 import { usePaneStore } from "@/stores/paneStore";
+import { useWindowStore, initWindowListeners } from "@/stores/windowStore";
 import { useQuakeMode } from "@/hooks/useQuakeMode";
 import { useMcpHandler } from "@/hooks/useMcpHandler";
 import { useSessionRestore } from "@/hooks/useSessionRestore";
 import { getTheme, AppTheme } from "@/config/themes";
+import type { Tab } from "@/types/terminal";
+
+// Declare global window properties for detached windows
+declare global {
+  interface Window {
+    __DETACHED_TAB_ID__?: string;
+    __WINDOW_ID__?: string;
+    __TAB_TITLE__?: string;
+    __TAB_SHELL__?: string;
+    __TAB_DISTRO__?: string | null;
+  }
+}
 
 // Theme context for global access
 export const ThemeContext = createContext<AppTheme | null>(null);
@@ -31,10 +45,38 @@ export const useTheme = () => {
   return theme;
 };
 
+// Check if this is a detached window and get tab info
+interface DetachedInfo {
+  isDetached: boolean;
+  tabId: string | null;
+  windowId: string | null;
+  title: string;
+  shell: "wsl" | "powershell" | "cmd";
+  distro?: string;
+}
+
+function isDetachedWindow(): DetachedInfo {
+  const tabId = window.__DETACHED_TAB_ID__ || null;
+  const windowId = window.__WINDOW_ID__ || null;
+  const title = window.__TAB_TITLE__ || "Detached Terminal";
+  const shell = (window.__TAB_SHELL__ as "wsl" | "powershell" | "cmd") || "wsl";
+  const distro = window.__TAB_DISTRO__ || undefined;
+
+  return {
+    isDetached: Boolean(tabId && windowId),
+    tabId,
+    windowId,
+    title,
+    shell,
+    distro,
+  };
+}
+
 function App() {
   const { tabs, activeTabId, addTab, removeTab, setActiveTab } = useTerminalStore();
   const { appearance } = useConfigStore();
   const { panes, initTabPane, splitPane, closePane, removeTabPanes } = usePaneStore();
+  const { setDetachedMode } = useWindowStore();
   const theme = getTheme(appearance.theme);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showQuickCommands, setShowQuickCommands] = useState(false);
@@ -42,6 +84,23 @@ function App() {
   const [showSSHSidebar, setShowSSHSidebar] = useState(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showServicesDashboard, setShowServicesDashboard] = useState(false);
+
+  // Check for detached window mode on mount
+  const detachedInfo = useMemo(() => isDetachedWindow(), []);
+
+  // Initialize detached mode in store if applicable
+  useEffect(() => {
+    if (detachedInfo.isDetached && detachedInfo.tabId && detachedInfo.windowId) {
+      setDetachedMode(detachedInfo.tabId, detachedInfo.windowId);
+    }
+  }, [detachedInfo, setDetachedMode]);
+
+  // Initialize window listeners for main window
+  useEffect(() => {
+    if (!detachedInfo.isDetached) {
+      initWindowListeners();
+    }
+  }, [detachedInfo.isDetached]);
 
   // Initialize quake mode
   useQuakeMode();
@@ -208,6 +267,23 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [tabs, activeTabId, addTab, removeTab, setActiveTab, panes, splitPane, closePane, setShowCommandPalette]);
+
+  // If this is a detached window, render the DetachedWindow component
+  if (detachedInfo.isDetached && detachedInfo.tabId && detachedInfo.windowId) {
+    // Create tab object from window properties
+    const detachedTab: Tab = {
+      id: detachedInfo.tabId,
+      title: detachedInfo.title,
+      shell: detachedInfo.shell,
+      distro: detachedInfo.distro,
+    };
+
+    return (
+      <ThemeContext.Provider value={theme}>
+        <DetachedWindow tab={detachedTab} windowId={detachedInfo.windowId} />
+      </ThemeContext.Provider>
+    );
+  }
 
   return (
     <ThemeContext.Provider value={theme}>
