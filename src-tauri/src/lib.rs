@@ -622,6 +622,183 @@ async fn set_quake_position(window: tauri::Window, height_percent: f64) -> Resul
     Ok(())
 }
 
+// ============================================================================
+// SSH Config Parsing & Secure Credentials (Phase 3)
+// ============================================================================
+
+#[derive(serde::Serialize)]
+struct SSHConfigHost {
+    name: String,
+    host: String,
+    user: Option<String>,
+    port: u16,
+    identity_file: Option<String>,
+}
+
+/// Parse ~/.ssh/config and return all hosts
+#[tauri::command]
+async fn parse_ssh_config() -> Result<Vec<SSHConfigHost>, String> {
+    let home = dirs::home_dir().ok_or("Could not find home directory")?;
+
+    // Try multiple paths (Windows native, WSL home, etc.)
+    let config_paths = vec![
+        home.join(".ssh").join("config"),
+        // Also try WSL path if on Windows
+        #[cfg(windows)]
+        std::path::PathBuf::from(format!("\\\\wsl$\\Ubuntu\\home\\{}/.ssh/config",
+            std::env::var("USERNAME").unwrap_or_default())),
+    ];
+
+    for config_path in config_paths {
+        if config_path.exists() {
+            return parse_ssh_config_file(&config_path);
+        }
+    }
+
+    // If no file found, return empty list (not an error)
+    Ok(vec![])
+}
+
+fn parse_ssh_config_file(path: &std::path::Path) -> Result<Vec<SSHConfigHost>, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read SSH config: {}", e))?;
+
+    let mut hosts: Vec<SSHConfigHost> = Vec::new();
+    let mut current_host: Option<SSHConfigHost> = None;
+
+    for line in content.lines() {
+        let line = line.trim();
+
+        // Skip comments and empty lines
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        // Split on first whitespace
+        let parts: Vec<&str> = line.splitn(2, |c: char| c.is_whitespace()).collect();
+        if parts.len() != 2 {
+            continue;
+        }
+
+        let key = parts[0].to_lowercase();
+        let value = parts[1].trim();
+
+        match key.as_str() {
+            "host" => {
+                // Save previous host if exists
+                if let Some(host) = current_host.take() {
+                    // Only add if it's not a wildcard
+                    if !host.name.contains('*') && !host.name.contains('?') {
+                        hosts.push(host);
+                    }
+                }
+
+                // Start new host
+                current_host = Some(SSHConfigHost {
+                    name: value.to_string(),
+                    host: value.to_string(), // Default to same as name
+                    user: None,
+                    port: 22,
+                    identity_file: None,
+                });
+            }
+            "hostname" => {
+                if let Some(ref mut host) = current_host {
+                    host.host = value.to_string();
+                }
+            }
+            "user" => {
+                if let Some(ref mut host) = current_host {
+                    host.user = Some(value.to_string());
+                }
+            }
+            "port" => {
+                if let Some(ref mut host) = current_host {
+                    host.port = value.parse().unwrap_or(22);
+                }
+            }
+            "identityfile" => {
+                if let Some(ref mut host) = current_host {
+                    // Expand ~ in path
+                    let expanded = if value.starts_with("~/") {
+                        if let Some(home) = dirs::home_dir() {
+                            value.replacen("~", home.to_string_lossy().as_ref(), 1)
+                        } else {
+                            value.to_string()
+                        }
+                    } else {
+                        value.to_string()
+                    };
+                    host.identity_file = Some(expanded);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Don't forget the last host
+    if let Some(host) = current_host {
+        if !host.name.contains('*') && !host.name.contains('?') {
+            hosts.push(host);
+        }
+    }
+
+    Ok(hosts)
+}
+
+const KEYRING_SERVICE: &str = "wsl-terminal-ssh";
+
+/// Store a password securely in the system keychain
+#[tauri::command]
+async fn store_ssh_credential(connection_id: String, password: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, &connection_id)
+        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+
+    entry.set_password(&password)
+        .map_err(|e| format!("Failed to store password: {}", e))?;
+
+    Ok(())
+}
+
+/// Retrieve a password from the system keychain
+#[tauri::command]
+async fn get_ssh_credential(connection_id: String) -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, &connection_id)
+        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+
+    match entry.get_password() {
+        Ok(password) => Ok(Some(password)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(format!("Failed to retrieve password: {}", e)),
+    }
+}
+
+/// Delete a password from the system keychain
+#[tauri::command]
+async fn delete_ssh_credential(connection_id: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, &connection_id)
+        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()), // Already deleted, that's fine
+        Err(e) => Err(format!("Failed to delete password: {}", e)),
+    }
+}
+
+/// Check if a credential exists in the keychain
+#[tauri::command]
+async fn has_ssh_credential(connection_id: String) -> Result<bool, String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, &connection_id)
+        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+
+    match entry.get_password() {
+        Ok(_) => Ok(true),
+        Err(keyring::Error::NoEntry) => Ok(false),
+        Err(e) => Err(format!("Failed to check password: {}", e)),
+    }
+}
+
 /// IPC response channel for MCP communication
 type IpcResponseTx = Arc<Mutex<Option<tokio::sync::oneshot::Sender<serde_json::Value>>>>;
 
@@ -842,7 +1019,12 @@ pub fn run() {
             ipc_response,
             start_service,
             stop_service,
-            get_process_stats
+            get_process_stats,
+            parse_ssh_config,
+            store_ssh_credential,
+            get_ssh_credential,
+            delete_ssh_credential,
+            has_ssh_credential
         ])
         .setup(move |app| {
             if cfg!(debug_assertions) {

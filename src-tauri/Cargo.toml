@@ -1,6 +1,6 @@
 [package]
 name = "wsl-terminal"
-version = "0.4.0"
+version = "0.7.0"
 description = "Modern WSL terminal emulator"
 authors = []
 license = "MIT"
@@ -30,3 +30,5 @@ toml = "0.8"
 dirs = "6"
 portable-pty = "0.8"
 anyhow = "1.0"
+keyring = "3"
+regex = "1"
