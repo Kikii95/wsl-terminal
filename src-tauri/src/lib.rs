@@ -24,11 +24,22 @@ fn silent_command(program: &str) -> std::process::Command {
     cmd
 }
 
+/// Escape a string for use in single-quoted bash strings
+fn bash_escape(s: &str) -> String {
+    // In single quotes, only single quotes need escaping: ' -> '\''
+    s.replace("'", "'\\''")
+}
+
 /// Execute a command through WSL (for Linux paths like /home/user/...)
 /// Returns (stdout, stderr, success)
 fn wsl_git_command(args: &[&str], wsl_path: &str) -> Result<std::process::Output, std::io::Error> {
+    // Quote each argument to prevent bash interpretation of special chars like %
+    let quoted_args: Vec<String> = args.iter()
+        .map(|arg| format!("'{}'", bash_escape(arg)))
+        .collect();
+
     // Build the git command to run inside WSL
-    let git_cmd = format!("cd '{}' && git {}", wsl_path, args.join(" "));
+    let git_cmd = format!("cd '{}' && git {}", bash_escape(wsl_path), quoted_args.join(" "));
 
     silent_command("wsl.exe")
         .args(["-e", "bash", "-c", &git_cmd])

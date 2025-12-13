@@ -141,6 +141,17 @@ export function ServicesDashboard({ isOpen, onClose }: ServicesDashboardProps) {
     });
   }, [services, autoRestartEnabled]);
 
+  // Handle Escape key to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   const handleStart = useCallback(async (id: string) => {
     const service = useServiceStore.getState().getServiceById(id);
     if (!service) return;
@@ -307,6 +318,7 @@ export function ServicesDashboard({ isOpen, onClose }: ServicesDashboardProps) {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}

@@ -232,6 +232,17 @@ export function GitPanel({ isOpen, onClose, cwd }: GitPanelProps) {
     }
   }, [isOpen, cwd]);
 
+  // Handle Escape key to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
@@ -273,17 +284,28 @@ export function GitPanel({ isOpen, onClose, cwd }: GitPanelProps) {
   if (!isOpen) return null;
 
   return (
-    <AnimatePresence>
+    <>
+      {/* Overlay for click-outside-to-close */}
       <motion.div
-        initial={{ x: 300, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: 300, opacity: 0 }}
-        className="fixed right-0 top-0 h-full w-80 z-50 flex flex-col overflow-hidden"
-        style={{
-          backgroundColor: theme.ui.surface,
-          borderLeft: `1px solid ${theme.ui.border}`,
-        }}
-      >
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="fixed inset-0 z-40"
+        style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+        onClick={onClose}
+      />
+      <AnimatePresence>
+        <motion.div
+          initial={{ x: 300, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: 300, opacity: 0 }}
+          className="fixed right-0 top-0 h-full w-80 z-50 flex flex-col overflow-hidden"
+          style={{
+            backgroundColor: theme.ui.surface,
+            borderLeft: `1px solid ${theme.ui.border}`,
+          }}
+        >
         {/* Header */}
         <div
           className="flex items-center justify-between h-12 px-4 shrink-0"
@@ -726,7 +748,8 @@ export function GitPanel({ isOpen, onClose, cwd }: GitPanelProps) {
             </div>
           )}
         </div>
-      </motion.div>
-    </AnimatePresence>
+        </motion.div>
+      </AnimatePresence>
+    </>
   );
 }

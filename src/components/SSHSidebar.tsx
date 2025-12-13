@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Server,
@@ -118,8 +118,34 @@ export function SSHSidebar({ isOpen, onClose }: SSHSidebarProps) {
     }
   }, [deletePassword, addToast]);
 
+  // Handle Escape key to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   return (
     <>
+      {/* Overlay for click-outside-to-close */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-30"
+            style={{ backgroundColor: "rgba(0, 0, 0, 0.3)" }}
+            onClick={onClose}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <AnimatePresence>
         {isOpen && (
