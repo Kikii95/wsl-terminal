@@ -146,10 +146,13 @@ async fn spawn_shell(
             // CRITICAL: c.env() only sets env vars for wsl.exe (Windows side), NOT for the Linux shell!
             // We must use a bash wrapper to set TERM/COLORTERM inside Linux before launching the user's shell.
             // This is essential for complex prompts like powerlevel10k that check COLORTERM for truecolor support.
-            let cwd_path = initial_cwd.as_deref().unwrap_or("~");
+            let cwd_cmd = match initial_cwd.as_deref() {
+                Some(path) => format!("cd '{}'", bash_escape(path)),
+                None => "cd ~".to_string(), // Don't quote ~ so bash expands it to $HOME
+            };
             let wrapper_cmd = format!(
-                "export TERM=xterm-256color; export COLORTERM=truecolor; cd '{}'; exec $SHELL -l",
-                bash_escape(cwd_path)
+                "export TERM=xterm-256color; export COLORTERM=truecolor; {}; exec $SHELL -l",
+                cwd_cmd
             );
             c.args(["-e", "bash", "-c", &wrapper_cmd]);
             c
@@ -181,10 +184,13 @@ async fn spawn_shell(
             if let Some(d) = &distro {
                 c.args(["-d", d]);
             }
-            let cwd_path = initial_cwd.as_deref().unwrap_or("~");
+            let cwd_cmd = match initial_cwd.as_deref() {
+                Some(path) => format!("cd '{}'", bash_escape(path)),
+                None => "cd ~".to_string(),
+            };
             let wrapper_cmd = format!(
-                "export TERM=xterm-256color; export COLORTERM=truecolor; cd '{}'; exec $SHELL -l",
-                bash_escape(cwd_path)
+                "export TERM=xterm-256color; export COLORTERM=truecolor; {}; exec $SHELL -l",
+                cwd_cmd
             );
             c.args(["-e", "bash", "-c", &wrapper_cmd]);
             c
