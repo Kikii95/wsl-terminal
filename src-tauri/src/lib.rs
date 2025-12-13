@@ -904,6 +904,575 @@ async fn attach_window_to_main(
     Ok(())
 }
 
+// ============================================================================
+// Git Integration (Phase 5)
+// ============================================================================
+
+#[derive(serde::Serialize)]
+struct GitStatusFile {
+    path: String,
+    status: String,      // "M", "A", "D", "R", "C", "U", "?"
+    staged: bool,
+}
+
+#[derive(serde::Serialize)]
+struct GitStatusResult {
+    branch: String,
+    upstream: Option<String>,
+    ahead: u32,
+    behind: u32,
+    files: Vec<GitStatusFile>,
+}
+
+#[derive(serde::Serialize)]
+struct GitBranch {
+    name: String,
+    current: bool,
+    upstream: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct GitCommit {
+    hash: String,
+    short_hash: String,
+    message: String,
+    author: String,
+    date: String,
+}
+
+/// Get comprehensive git status
+#[tauri::command]
+async fn git_status(cwd: String) -> Result<GitStatusResult, String> {
+    // Get branch info
+    let branch_output = silent_command("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Git not available: {}", e))?;
+
+    if !branch_output.status.success() {
+        return Err("Not a git repository".to_string());
+    }
+
+    let branch = String::from_utf8_lossy(&branch_output.stdout).trim().to_string();
+
+    // Get upstream
+    let upstream_output = silent_command("git")
+        .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"])
+        .current_dir(&cwd)
+        .output();
+
+    let upstream = upstream_output.ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+
+    // Get ahead/behind
+    let (ahead, behind) = if upstream.is_some() {
+        let ab_output = silent_command("git")
+            .args(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
+            .current_dir(&cwd)
+            .output();
+
+        match ab_output {
+            Ok(o) if o.status.success() => {
+                let text = String::from_utf8_lossy(&o.stdout);
+                let parts: Vec<&str> = text.trim().split('\t').collect();
+                if parts.len() == 2 {
+                    (parts[0].parse().unwrap_or(0), parts[1].parse().unwrap_or(0))
+                } else {
+                    (0, 0)
+                }
+            }
+            _ => (0, 0)
+        }
+    } else {
+        (0, 0)
+    };
+
+    // Get file status (porcelain v2 for better parsing)
+    let status_output = silent_command("git")
+        .args(["status", "--porcelain=v1"])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to get status: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&status_output.stdout);
+    let mut files = Vec::new();
+
+    for line in stdout.lines() {
+        if line.len() < 4 {
+            continue;
+        }
+
+        let index_status = line.chars().nth(0).unwrap_or(' ');
+        let worktree_status = line.chars().nth(1).unwrap_or(' ');
+        let path = line[3..].to_string();
+
+        // Staged changes (index has modification)
+        if index_status != ' ' && index_status != '?' {
+            files.push(GitStatusFile {
+                path: path.clone(),
+                status: index_status.to_string(),
+                staged: true,
+            });
+        }
+
+        // Unstaged changes (worktree has modification)
+        if worktree_status != ' ' {
+            let status = if worktree_status == '?' { "?".to_string() } else { worktree_status.to_string() };
+            files.push(GitStatusFile {
+                path,
+                status,
+                staged: false,
+            });
+        }
+    }
+
+    Ok(GitStatusResult {
+        branch,
+        upstream,
+        ahead,
+        behind,
+        files,
+    })
+}
+
+/// Get list of branches
+#[tauri::command]
+async fn git_branches(cwd: String) -> Result<Vec<GitBranch>, String> {
+    let output = silent_command("git")
+        .args(["branch", "-a", "--format=%(HEAD) %(refname:short) %(upstream:short)"])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to list branches: {}", e))?;
+
+    if !output.status.success() {
+        return Err("Failed to list branches".to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut branches = Vec::new();
+
+    for line in stdout.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        let current = line.starts_with('*');
+        let parts: Vec<&str> = line[2..].split_whitespace().collect();
+
+        if let Some(name) = parts.first() {
+            // Skip remotes/origin/HEAD
+            if name.contains("HEAD") {
+                continue;
+            }
+
+            branches.push(GitBranch {
+                name: name.to_string(),
+                current,
+                upstream: parts.get(1).map(|s| s.to_string()),
+            });
+        }
+    }
+
+    Ok(branches)
+}
+
+/// Get commit log
+#[tauri::command]
+async fn git_log(cwd: String, count: Option<u32>) -> Result<Vec<GitCommit>, String> {
+    let count_str = count.unwrap_or(20).to_string();
+
+    let output = silent_command("git")
+        .args(["log", &format!("-{}", count_str), "--format=%H|%h|%s|%an|%ar"])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to get log: {}", e))?;
+
+    if !output.status.success() {
+        return Err("Failed to get log".to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut commits = Vec::new();
+
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.splitn(5, '|').collect();
+        if parts.len() >= 5 {
+            commits.push(GitCommit {
+                hash: parts[0].to_string(),
+                short_hash: parts[1].to_string(),
+                message: parts[2].to_string(),
+                author: parts[3].to_string(),
+                date: parts[4].to_string(),
+            });
+        }
+    }
+
+    Ok(commits)
+}
+
+/// Stage a file
+#[tauri::command]
+async fn git_stage(cwd: String, path: String) -> Result<(), String> {
+    let output = silent_command("git")
+        .args(["add", &path])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to stage: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to stage: {}", stderr));
+    }
+
+    Ok(())
+}
+
+/// Stage all files
+#[tauri::command]
+async fn git_stage_all(cwd: String) -> Result<(), String> {
+    let output = silent_command("git")
+        .args(["add", "-A"])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to stage all: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to stage all: {}", stderr));
+    }
+
+    Ok(())
+}
+
+/// Unstage a file
+#[tauri::command]
+async fn git_unstage(cwd: String, path: String) -> Result<(), String> {
+    let output = silent_command("git")
+        .args(["reset", "HEAD", &path])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to unstage: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to unstage: {}", stderr));
+    }
+
+    Ok(())
+}
+
+/// Commit staged changes
+#[tauri::command]
+async fn git_commit(cwd: String, message: String) -> Result<String, String> {
+    let output = silent_command("git")
+        .args(["commit", "-m", &message])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to commit: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Commit failed: {}", stderr));
+    }
+
+    // Get the commit hash
+    let hash_output = silent_command("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .current_dir(&cwd)
+        .output();
+
+    let hash = hash_output
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+
+    Ok(hash)
+}
+
+/// Checkout a branch
+#[tauri::command]
+async fn git_checkout(cwd: String, branch: String) -> Result<(), String> {
+    let output = silent_command("git")
+        .args(["checkout", &branch])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to checkout: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Checkout failed: {}", stderr));
+    }
+
+    Ok(())
+}
+
+/// Discard changes to a file
+#[tauri::command]
+async fn git_discard(cwd: String, path: String) -> Result<(), String> {
+    let output = silent_command("git")
+        .args(["checkout", "--", &path])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to discard: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Discard failed: {}", stderr));
+    }
+
+    Ok(())
+}
+
+/// Pull from remote
+#[tauri::command]
+async fn git_pull(cwd: String) -> Result<String, String> {
+    let output = silent_command("git")
+        .args(["pull"])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to pull: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Pull failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.trim().to_string())
+}
+
+/// Push to remote
+#[tauri::command]
+async fn git_push(cwd: String) -> Result<String, String> {
+    let output = silent_command("git")
+        .args(["push"])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| format!("Failed to push: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Push failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    Ok(format!("{}{}", stdout.trim(), stderr.trim()))
+}
+
+// ============================================================================
+// Docker Integration (Phase 5)
+// ============================================================================
+
+#[derive(serde::Serialize)]
+struct DockerContainerFull {
+    id: String,
+    name: String,
+    image: String,
+    status: String,
+    state: String,  // "running", "exited", "paused", "created", "restarting"
+    ports: Vec<String>,
+    created: String,
+}
+
+#[derive(serde::Serialize)]
+struct DockerImage {
+    id: String,
+    repository: String,
+    tag: String,
+    size: String,
+    created: String,
+}
+
+#[derive(serde::Serialize)]
+struct DockerVolume {
+    name: String,
+    driver: String,
+    mountpoint: String,
+}
+
+/// Get all docker containers (running and stopped)
+#[tauri::command]
+async fn docker_containers() -> Result<Vec<DockerContainerFull>, String> {
+    let output = silent_command("docker")
+        .args(["ps", "-a", "--format", "{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.State}}|{{.Ports}}|{{.CreatedAt}}"])
+        .output()
+        .map_err(|e| format!("Docker not available: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to list containers: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut containers = Vec::new();
+
+    for line in stdout.lines() {
+        if line.is_empty() {
+            continue;
+        }
+
+        let parts: Vec<&str> = line.splitn(7, '|').collect();
+        if parts.len() >= 7 {
+            let ports: Vec<String> = parts[5]
+                .split(", ")
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .collect();
+
+            containers.push(DockerContainerFull {
+                id: parts[0].to_string(),
+                name: parts[1].to_string(),
+                image: parts[2].to_string(),
+                status: parts[3].to_string(),
+                state: parts[4].to_lowercase(),
+                ports,
+                created: parts[6].to_string(),
+            });
+        }
+    }
+
+    Ok(containers)
+}
+
+/// Get all docker images
+#[tauri::command]
+async fn docker_images() -> Result<Vec<DockerImage>, String> {
+    let output = silent_command("docker")
+        .args(["images", "--format", "{{.ID}}|{{.Repository}}|{{.Tag}}|{{.Size}}|{{.CreatedAt}}"])
+        .output()
+        .map_err(|e| format!("Docker not available: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to list images: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut images = Vec::new();
+
+    for line in stdout.lines() {
+        if line.is_empty() {
+            continue;
+        }
+
+        let parts: Vec<&str> = line.splitn(5, '|').collect();
+        if parts.len() >= 5 {
+            images.push(DockerImage {
+                id: parts[0].to_string(),
+                repository: parts[1].to_string(),
+                tag: parts[2].to_string(),
+                size: parts[3].to_string(),
+                created: parts[4].to_string(),
+            });
+        }
+    }
+
+    Ok(images)
+}
+
+/// Get all docker volumes
+#[tauri::command]
+async fn docker_volumes() -> Result<Vec<DockerVolume>, String> {
+    let output = silent_command("docker")
+        .args(["volume", "ls", "--format", "{{.Name}}|{{.Driver}}|{{.Mountpoint}}"])
+        .output()
+        .map_err(|e| format!("Docker not available: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to list volumes: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut volumes = Vec::new();
+
+    for line in stdout.lines() {
+        if line.is_empty() {
+            continue;
+        }
+
+        let parts: Vec<&str> = line.splitn(3, '|').collect();
+        if parts.len() >= 2 {
+            volumes.push(DockerVolume {
+                name: parts[0].to_string(),
+                driver: parts[1].to_string(),
+                mountpoint: parts.get(2).unwrap_or(&"").to_string(),
+            });
+        }
+    }
+
+    Ok(volumes)
+}
+
+/// Start a container
+#[tauri::command]
+async fn docker_start(container_id: String) -> Result<(), String> {
+    let output = silent_command("docker")
+        .args(["start", &container_id])
+        .output()
+        .map_err(|e| format!("Failed to start container: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Start failed: {}", stderr));
+    }
+
+    Ok(())
+}
+
+/// Stop a container
+#[tauri::command]
+async fn docker_stop(container_id: String) -> Result<(), String> {
+    let output = silent_command("docker")
+        .args(["stop", &container_id])
+        .output()
+        .map_err(|e| format!("Failed to stop container: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Stop failed: {}", stderr));
+    }
+
+    Ok(())
+}
+
+/// Restart a container
+#[tauri::command]
+async fn docker_restart(container_id: String) -> Result<(), String> {
+    let output = silent_command("docker")
+        .args(["restart", &container_id])
+        .output()
+        .map_err(|e| format!("Failed to restart container: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Restart failed: {}", stderr));
+    }
+
+    Ok(())
+}
+
+/// Remove a container
+#[tauri::command]
+async fn docker_remove(container_id: String) -> Result<(), String> {
+    let output = silent_command("docker")
+        .args(["rm", "-f", &container_id])
+        .output()
+        .map_err(|e| format!("Failed to remove container: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Remove failed: {}", stderr));
+    }
+
+    Ok(())
+}
+
 /// IPC response channel for MCP communication
 type IpcResponseTx = Arc<Mutex<Option<tokio::sync::oneshot::Sender<serde_json::Value>>>>;
 
@@ -1135,7 +1704,27 @@ pub fn run() {
             close_detached_window,
             set_always_on_top,
             get_all_windows,
-            attach_window_to_main
+            attach_window_to_main,
+            // Git Integration (Phase 5)
+            git_status,
+            git_branches,
+            git_log,
+            git_stage,
+            git_stage_all,
+            git_unstage,
+            git_commit,
+            git_checkout,
+            git_discard,
+            git_pull,
+            git_push,
+            // Docker Integration (Phase 5)
+            docker_containers,
+            docker_images,
+            docker_volumes,
+            docker_start,
+            docker_stop,
+            docker_restart,
+            docker_remove
         ])
         .setup(move |app| {
             if cfg!(debug_assertions) {

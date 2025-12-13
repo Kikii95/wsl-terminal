@@ -13,6 +13,8 @@ import { ToastContainer } from "@/components/ToastContainer";
 import { WorkspaceManager } from "@/components/WorkspaceManager";
 import { ServicesDashboard } from "@/components/ServicesDashboard";
 import { DetachedWindow } from "@/components/DetachedWindow";
+import { GitPanel } from "@/components/GitPanel";
+import { DockerPanel } from "@/components/DockerPanel";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useConfigStore } from "@/stores/configStore";
 import { usePaneStore } from "@/stores/paneStore";
@@ -84,6 +86,12 @@ function App() {
   const [showSSHSidebar, setShowSSHSidebar] = useState(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showServicesDashboard, setShowServicesDashboard] = useState(false);
+  const [showGitPanel, setShowGitPanel] = useState(false);
+  const [showDockerPanel, setShowDockerPanel] = useState(false);
+
+  // Récupérer le cwd du tab actif pour Git Panel
+  const activeTab = tabs.find(t => t.id === activeTabId);
+  const activeCwd = activeTab?.cwd;
 
   // Check for detached window mode on mount
   const detachedInfo = useMemo(() => isDetachedWindow(), []);
@@ -262,11 +270,25 @@ function App() {
         e.preventDefault();
         setShowServicesDashboard(true);
       }
+
+      // Ctrl+Shift+G: Git Panel
+      if (e.ctrlKey && e.shiftKey && e.key === "G") {
+        e.preventDefault();
+        setShowGitPanel(!showGitPanel);
+        setShowDockerPanel(false);
+      }
+
+      // Ctrl+Shift+Y: Docker Panel
+      if (e.ctrlKey && e.shiftKey && e.key === "Y") {
+        e.preventDefault();
+        setShowDockerPanel(!showDockerPanel);
+        setShowGitPanel(false);
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [tabs, activeTabId, addTab, removeTab, setActiveTab, panes, splitPane, closePane, setShowCommandPalette]);
+  }, [tabs, activeTabId, addTab, removeTab, setActiveTab, panes, splitPane, closePane, showGitPanel, showDockerPanel]);
 
   // If this is a detached window, render the DetachedWindow component
   if (detachedInfo.isDetached && detachedInfo.tabId && detachedInfo.windowId) {
@@ -453,6 +475,19 @@ function App() {
         <ServicesDashboard
           isOpen={showServicesDashboard}
           onClose={() => setShowServicesDashboard(false)}
+        />
+
+        {/* Git Panel */}
+        <GitPanel
+          isOpen={showGitPanel}
+          onClose={() => setShowGitPanel(false)}
+          cwd={activeCwd}
+        />
+
+        {/* Docker Panel */}
+        <DockerPanel
+          isOpen={showDockerPanel}
+          onClose={() => setShowDockerPanel(false)}
         />
 
         {/* Toast Notifications */}
