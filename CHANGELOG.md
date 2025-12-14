@@ -5,6 +5,25 @@ All notable changes to WSL Terminal will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.10] - 2024-12-14
+
+### Fixed
+- **Shell environment variables**: TERM and COLORTERM are now properly passed to Linux shells
+  - Added bash wrapper to export TERM=xterm-256color and COLORTERM=truecolor inside WSL
+  - This fixes issues with prompts like powerlevel10k that require COLORTERM detection
+- **Tilde expansion bug**: Fixed "cd: ~: No such file or directory" error
+  - Home directory `cd ~` is no longer single-quoted, allowing proper bash expansion
+
+### Known Issues
+- **oh-my-zsh incompatibility**: oh-my-zsh prompts (including powerlevel10k) may cause rendering issues with xterm.js
+  - Workaround: Use starship or pure zsh for wsl-terminal, keep oh-my-zsh for Windows Terminal
+  - See README for conditional .zshrc setup
+
+## [0.9.4] - 2024-12-13
+
+### Fixed
+- Minor bugfixes and stability improvements
+
 ## [0.9.3] - 2024-12-13
 
 ### Fixed
